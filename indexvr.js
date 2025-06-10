@@ -382,19 +382,111 @@ scene.createDefaultXRExperienceAsync({
 
 scene.clearColor = new BABYLON.Color4(0, 0, 0, 1);
 
-// Restore default movement, but add z translation for left joystick up/down
+// Enhanced movement: left joystick controls Y (up/down) - SIMPLIFIED VERSION
+let debugLogCount = 0;
+const MAX_DEBUG_LOGS = 10; // Limit debug logs to avoid console spam
+
 scene.onBeforeRenderObservable.add(() => {
-    if (typeof xrHelper !== "undefined" && xrHelper.input && xrHelper.input.controllers) {
-        const leftController = xrHelper.input.controllers.find(c => c.inputSource.handedness === "left");
-        if (leftController && leftController.motionController) {
-            const thumbstick = leftController.motionController.getComponent("xr-standard-thumbstick");
-            if (thumbstick && thumbstick.axes) {
-                const axis = thumbstick.axes;
-                const zDelta = -axis[1] * 0.1; // Adjust speed as needed
-                if (Math.abs(axis[1]) > 0.05 && scene.activeCamera) {
-                    scene.activeCamera.position.z += zDelta;
+    // Check if we're in VR mode and have controllers
+    if (window.xrHelper && window.xrHelper.input && window.xrHelper.input.controllers.length > 0) {
+        
+        debugLogCount++;
+        if (debugLogCount <= MAX_DEBUG_LOGS) {
+            console.log("XR Controllers found:", window.xrHelper.input.controllers.length);
+        }
+        
+        // Find left controller
+        const leftController = window.xrHelper.input.controllers.find(c =>
+            c.inputSource && c.inputSource.handedness === "left"
+        );
+        
+        if (leftController) {
+            if (debugLogCount <= MAX_DEBUG_LOGS) {
+                console.log("Left controller found, checking for motion controller...");
+            }
+            
+            // Method 1: Try motion controller components
+            if (leftController.motionController) {
+                const componentNames = ["xr-standard-thumbstick", "thumbstick", "trackpad"];
+                
+                for (const name of componentNames) {
+                    const component = leftController.motionController.getComponent(name);
+                    if (component && component.axes && component.axes.length >= 2) {
+                        const yAxis = component.axes[1]; // Y axis (up/down)
+                        
+                        if (Math.abs(yAxis) > 0.1) { // Deadzone
+                            const movementSpeed = 0.15;
+                            const yDelta = -yAxis * movementSpeed; // Inverted for intuitive control
+                            scene.activeCamera.position.y += yDelta;
+                            
+                            console.log(`VR VERTICAL MOVEMENT - Component: ${name}, Y-axis: ${yAxis.toFixed(2)}, Camera Y: ${scene.activeCamera.position.y.toFixed(2)}`);
+                        }
+                        break; // Found working component, stop searching
+                    }
+                }
+                
+                // Debug: Log available components (limited times)
+                if (debugLogCount <= 3) {
+                    const components = Object.keys(leftController.motionController.components);
+                    console.log("Available motion controller components:", components);
                 }
             }
+            
+            // Method 2: Direct gamepad access
+            if (leftController.inputSource.gamepad) {
+                const gamepad = leftController.inputSource.gamepad;
+                if (gamepad.axes && gamepad.axes.length >= 4) {
+                    const leftStickY = gamepad.axes[3]; // Standard left stick Y
+                    
+                    if (Math.abs(leftStickY) > 0.1) {
+                        const movementSpeed = 0.15;
+                        const yDelta = -leftStickY * movementSpeed;
+                        scene.activeCamera.position.y += yDelta;
+                        
+                        console.log(`VR VERTICAL MOVEMENT - Gamepad Y: ${leftStickY.toFixed(2)}, Camera Y: ${scene.activeCamera.position.y.toFixed(2)}`);
+                    }
+                }
+                
+                // Debug: Log gamepad info (limited times)
+                if (debugLogCount <= 3) {
+                    console.log("Gamepad axes count:", gamepad.axes ? gamepad.axes.length : 0);
+                    console.log("Gamepad buttons count:", gamepad.buttons ? gamepad.buttons.length : 0);
+                }
+            }
+        } else if (debugLogCount <= MAX_DEBUG_LOGS) {
+            console.log("No left controller found");
+        }
+    } else {
+        // Not in VR mode - show this message only a few times
+        if (debugLogCount <= 3) {
+            console.log("Not in VR mode or no controllers available");
+        }
+        debugLogCount++;
+    }
+    
+    // Alternative: Keyboard controls for testing on desktop
+    if (!window.xrHelper || window.xrHelper.input.controllers.length === 0) {
+        // Add keyboard controls for testing vertical movement
+        if (scene.actionManager) {
+            // This will be handled by keyboard events if we add them
+        }
+    }
+});
+
+// Add keyboard controls for testing vertical movement on desktop
+document.addEventListener('keydown', (event) => {
+    if (!window.xrHelper || window.xrHelper.input.controllers.length === 0) {
+        const movementSpeed = 0.1;
+        
+        switch(event.key.toLowerCase()) {
+            case 'q': // Q key for up
+                scene.activeCamera.position.y += movementSpeed;
+                console.log("KEYBOARD UP - Camera Y:", scene.activeCamera.position.y.toFixed(2));
+                break;
+            case 'e': // E key for down
+                scene.activeCamera.position.y -= movementSpeed;
+                console.log("KEYBOARD DOWN - Camera Y:", scene.activeCamera.position.y.toFixed(2));
+                break;
         }
     }
 });
