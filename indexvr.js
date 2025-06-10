@@ -902,31 +902,42 @@ document.addEventListener("DOMContentLoaded", function() {
 });
 
 loadFileButton.addEventListener('click', async () => {
-    const fileInput = document.getElementById('fileInput');
-    const file = fileInput.files[0];
+    const fileSelect = document.getElementById('fileSelect');
+    const selectedFile = fileSelect.value;
 
-    if (file) {
+    if (selectedFile) {
         try {
-            const reader = new FileReader();
-            reader.onload = async function(event) {
-                const newdata = JSON.parse(event.target.result);
-                main(newdata, 20);
+            if (selectedFile === 'encrypted_PSO_0.json') {
+                // Handle encrypted file
+                const password = await showPasswordModal();
+                const response = await fetch('./' + selectedFile);
+                const encryptedData = await response.text();
+                const decryptedData = decryptData(encryptedData, password);
+                
+                if (decryptedData) {
+                    main(decryptedData, 20);
+                    document.getElementById('fileInputContainer').style.display = 'none';
+                }
+            } else {
+                // Handle regular JSON file
+                const response = await fetch('./' + selectedFile);
+                const data = await response.json();
+                main(data, 20);
                 document.getElementById('fileInputContainer').style.display = 'none';
-            };
-            reader.readAsText(file);
+            }
         } catch (error) {
-            alert('An error occurred while parsing the file.');
+            alert('Erreur lors du chargement du fichier: ' + error.message);
             console.error(error);
         }
     } else {
         try {
-            // Use test data for easier testing
+            // Use test data as default
             const response = await fetch('./test_particles.json');
             const data = await response.json();
             main(data, 20);
             document.getElementById('fileInputContainer').style.display = 'none';
         } catch (error) {
-            console.error("Failed to load JSON:", error);
+            console.error("Failed to load default JSON:", error);
         }
     }
 });
