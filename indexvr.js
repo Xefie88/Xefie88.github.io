@@ -8,16 +8,110 @@ const engine = new BABYLON.Engine(canvas, true, {
 });
 const scene = new BABYLON.Scene(engine);
 
-// XR Setup
+// XR Setup - Simple and stable configuration
 scene.createDefaultXRExperienceAsync({
     floorMeshes: [],
     disableTeleportation: true,
-    inputOptions: { doNotLoadControllerMeshes: true },
-    optionalFeatures: true
+    inputOptions: {
+        doNotLoadControllerMeshes: false  // Enable controller meshes
+    }
 }).then(xrHelper => {
     console.log("WebXR initialized.");
-    // Global reference for left thumbstick
+    window.xrHelper = xrHelper; // Global reference
     window.leftThumbstick = null;
+
+    // Simple controller setup
+    xrHelper.input.onControllerAddedObservable.add((controller) => {
+        console.log("Controller added:", controller.inputSource.handedness);
+        
+        controller.onMotionControllerInitObservable.add((motionController) => {
+            console.log("Motion controller initialized for:", motionController.handness);
+            
+            // Ensure controller mesh is visible with enhanced materials
+            if (motionController.rootMesh) {
+                motionController.rootMesh.setEnabled(true);
+                motionController.rootMesh.isVisible = true;
+                
+                // Make controller meshes glow
+                motionController.rootMesh.getChildMeshes().forEach(mesh => {
+                    mesh.setEnabled(true);
+                    mesh.isVisible = true;
+                    if (mesh.material) {
+                        mesh.material.emissiveColor = new BABYLON.Color3(0.5, 0.5, 0.5);
+                        mesh.material.diffuseColor = new BABYLON.Color3(0.8, 0.8, 0.8);
+                    }
+                });
+            }
+        });
+    });
+
+    // Enhanced controller setup with better pointer visibility
+    xrHelper.input.onControllerAddedObservable.add((controller) => {
+        console.log("Controller added:", controller.inputSource.handedness);
+        
+        controller.onMotionControllerInitObservable.add((motionController) => {
+            console.log("Motion controller initialized for:", motionController.handness);
+            
+            // Ensure controller mesh is visible with enhanced materials
+            if (motionController.rootMesh) {
+                motionController.rootMesh.setEnabled(true);
+                motionController.rootMesh.isVisible = true;
+                
+                // Make controller meshes glow with different colors for left/right
+                const isLeft = motionController.handness === 'left';
+                const emissiveColor = isLeft ? new BABYLON.Color3(0, 0.8, 0) : new BABYLON.Color3(0.8, 0, 0);
+                
+                motionController.rootMesh.getChildMeshes().forEach(mesh => {
+                    mesh.setEnabled(true);
+                    mesh.isVisible = true;
+                    if (mesh.material) {
+                        mesh.material.emissiveColor = emissiveColor;
+                        mesh.material.diffuseColor = new BABYLON.Color3(0.8, 0.8, 0.8);
+                    }
+                });
+            }
+            
+            // Force pointer ray creation for this controller
+            setTimeout(() => {
+                createControllerPointer(controller, motionController);
+            }, 100);
+        });
+    });
+
+    // Function to create/enhance controller pointers
+    function createControllerPointer(controller, motionController) {
+        console.log("Creating pointer for controller:", motionController.handness);
+        
+        // Create a custom pointer ray if none exists
+        if (!controller.pointer || !controller.pointer.isVisible) {
+            const isLeft = motionController.handness === 'left';
+            const rayColor = isLeft ? new BABYLON.Color3(0, 1, 0) : new BABYLON.Color3(1, 0, 0);
+            
+            // Create ray mesh
+            const ray = BABYLON.MeshBuilder.CreateCylinder("controllerRay_" + motionController.handness, {
+                height: 10,
+                diameterTop: 0.005,
+                diameterBottom: 0.02,
+                tessellation: 8
+            }, scene);
+            
+            // Create glowing material
+            const rayMaterial = new BABYLON.StandardMaterial("rayMat_" + motionController.handness, scene);
+            rayMaterial.emissiveColor = rayColor;
+            rayMaterial.disableLighting = true;
+            rayMaterial.alpha = 0.8;
+            ray.material = rayMaterial;
+            
+            // Position ray relative to controller
+            if (motionController.rootMesh) {
+                ray.parent = motionController.rootMesh;
+                ray.position = new BABYLON.Vector3(0, 0, 5);
+                ray.rotation.x = Math.PI / 2;
+                
+                console.log("Custom pointer ray created for", motionController.handness, "controller");
+            }
+        }
+    }
 
     // XR legend panel setup (hidden by default)
 
@@ -248,11 +342,41 @@ scene.createDefaultXRExperienceAsync({
     });
 
     // Enable POINTER_SELECTION for controller pointer ray selection
-    xrHelper.baseExperience.featuresManager.enableFeature(
-        BABYLON.WebXRFeatureName.POINTER_SELECTION, 'latest', {
-            xrInput: xrHelper.input
-        }
-    );
+    try {
+        const pointerFeature = xrHelper.baseExperience.featuresManager.enableFeature(
+            BABYLON.WebXRFeatureName.POINTER_SELECTION, 'latest', {
+                xrInput: xrHelper.input,
+                enablePointerSelectionOnAllControllers: true
+            }
+        );
+        
+        console.log("Pointer selection feature enabled");
+        
+        // Enhance existing pointer rays when they become available
+        setTimeout(() => {
+            xrHelper.input.controllers.forEach(controller => {
+                if (controller.pointer) {
+                    console.log("Enhancing pointer for controller:", controller.inputSource.handedness);
+                    
+                    // Make pointer ray more visible
+                    if (controller.pointer.material) {
+                        const isLeft = controller.inputSource.handedness === 'left';
+                        controller.pointer.material.emissiveColor = isLeft ?
+                            new BABYLON.Color3(0, 1, 0) : new BABYLON.Color3(1, 0, 0);
+                        controller.pointer.material.alpha = 0.9;
+                        controller.pointer.material.disableLighting = true;
+                    }
+                    
+                    // Ensure pointer is visible
+                    controller.pointer.setEnabled(true);
+                    controller.pointer.isVisible = true;
+                }
+            });
+        }, 2000);
+        
+    } catch (error) {
+        console.log("Pointer selection feature not available:", error);
+    }
 });
 
 
@@ -282,6 +406,104 @@ camera.speed = 0.9;
 camera.angularSpeed = 0.05;
 camera.angle = Math.PI / 2;
 camera.direction = new BABYLON.Vector3(Math.cos(camera.angle), 0, Math.sin(camera.angle));
+
+// Create simulated VR controllers for desktop viewing
+function createSimulatedControllers() {
+    console.log("Creating simulated VR controllers for desktop viewing");
+    
+    try {
+        // Left controller - green sphere
+        const leftController = BABYLON.MeshBuilder.CreateSphere("leftController", {diameter: 0.2}, scene);
+        leftController.position = new BABYLON.Vector3(-1.5, 1.2, 2);
+        
+        const leftMat = new BABYLON.StandardMaterial("leftControllerMat", scene);
+        leftMat.diffuseColor = new BABYLON.Color3(0, 0.8, 0); // Green
+        leftMat.emissiveColor = new BABYLON.Color3(0, 0.5, 0); // Bright glow
+        leftController.material = leftMat;
+        
+        // Right controller - red sphere
+        const rightController = BABYLON.MeshBuilder.CreateSphere("rightController", {diameter: 0.2}, scene);
+        rightController.position = new BABYLON.Vector3(1.5, 1.2, 2);
+        
+        const rightMat = new BABYLON.StandardMaterial("rightControllerMat", scene);
+        rightMat.diffuseColor = new BABYLON.Color3(0.8, 0, 0); // Red
+        rightMat.emissiveColor = new BABYLON.Color3(0.5, 0, 0); // Bright glow
+        rightController.material = rightMat;
+        
+        // Create static pointer rays using boxes (more stable than lines)
+        const leftRay = BABYLON.MeshBuilder.CreateBox("leftRay", {
+            width: 0.02,
+            height: 0.02,
+            depth: 8
+        }, scene);
+        leftRay.position = leftController.position.add(new BABYLON.Vector3(0, 0, 4));
+        
+        const leftRayMat = new BABYLON.StandardMaterial("leftRayMat", scene);
+        leftRayMat.emissiveColor = new BABYLON.Color3(0, 1, 0); // Bright green
+        leftRayMat.disableLighting = true;
+        leftRayMat.alpha = 0.8;
+        leftRay.material = leftRayMat;
+        
+        const rightRay = BABYLON.MeshBuilder.CreateBox("rightRay", {
+            width: 0.02,
+            height: 0.02,
+            depth: 8
+        }, scene);
+        rightRay.position = rightController.position.add(new BABYLON.Vector3(0, 0, 4));
+        
+        const rightRayMat = new BABYLON.StandardMaterial("rightRayMat", scene);
+        rightRayMat.emissiveColor = new BABYLON.Color3(1, 0, 0); // Bright red
+        rightRayMat.disableLighting = true;
+        rightRayMat.alpha = 0.8;
+        rightRay.material = rightRayMat;
+        
+        // Parent rays to controllers for synchronized movement
+        leftRay.parent = leftController;
+        leftRay.position = new BABYLON.Vector3(0, 0, 4);
+        
+        rightRay.parent = rightController;
+        rightRay.position = new BABYLON.Vector3(0, 0, 4);
+        
+        // Store references
+        window.simulatedControllers = {
+            left: leftController,
+            right: rightController,
+            leftRay: leftRay,
+            rightRay: rightRay
+        };
+        
+        // Simple floating animation - only move controllers, rays follow automatically
+        let animTime = 0;
+        const leftBasePos = leftController.position.clone();
+        const rightBasePos = rightController.position.clone();
+        
+        scene.onBeforeRenderObservable.add(() => {
+            if (window.simulatedControllers) {
+                animTime += 0.02;
+                
+                // Gentle floating motion
+                leftController.position.y = leftBasePos.y + Math.sin(animTime) * 0.15;
+                rightController.position.y = rightBasePos.y + Math.sin(animTime + Math.PI) * 0.15;
+                
+                // Gentle rotation for visibility
+                leftController.rotation.y = Math.sin(animTime * 0.5) * 0.3;
+                rightController.rotation.y = Math.sin(animTime * 0.5 + Math.PI) * 0.3;
+                
+                // Pulsing glow effect
+                const pulse = 0.5 + Math.sin(animTime * 3) * 0.3;
+                leftRayMat.alpha = pulse;
+                rightRayMat.alpha = pulse;
+            }
+        });
+        
+        console.log("Simulated controllers created successfully with stable rays");
+    } catch (error) {
+        console.error("Error creating simulated controllers:", error);
+    }
+}
+
+// Create simulated controllers for desktop viewing
+createSimulatedControllers();
 
 
 scene.onPointerObservable.add((pointerInfo) => {
@@ -605,15 +827,10 @@ loadFileButton.addEventListener('click', async () => {
         }
     } else {
         try {
-			
-			const response = await fetch('./encrypted_PSO_0.json');
-            const encryptedData = await response.text();
-            const password = await showPasswordModal();
-            const data = decryptData(encryptedData, password);
-			
-            //const response = await fetch('./PSO_0.json');
-            //const data = await response.json();
-            main(data, 1);
+            // Use test data for easier testing
+            const response = await fetch('./test_particles.json');
+            const data = await response.json();
+            main(data, 20);
             document.getElementById('fileInputContainer').style.display = 'none';
         } catch (error) {
             console.error("Failed to load JSON:", error);

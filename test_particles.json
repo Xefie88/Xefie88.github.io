@@ -1,0 +1,352 @@
+[
+  {
+    "prefLabel": "JavaScript",
+    "x": 0.5,
+    "y": 0.3,
+    "z": -0.2,
+    "subType": "PROGRAMMING_LANGUAGE"
+  },
+  {
+    "prefLabel": "Python",
+    "x": -0.4,
+    "y": 0.7,
+    "z": 0.3,
+    "subType": "PROGRAMMING_LANGUAGE"
+  },
+  {
+    "prefLabel": "React",
+    "x": 0.8,
+    "y": -0.3,
+    "z": 0.5,
+    "subType": "FRAMEWORK"
+  },
+  {
+    "prefLabel": "Node.js",
+    "x": -0.7,
+    "y": 0.4,
+    "z": -0.4,
+    "subType": "PLATFORM"
+  },
+  {
+    "prefLabel": "MongoDB",
+    "x": 0.4,
+    "y": -0.6,
+    "z": 0.3,
+    "subType": "DATABASE"
+  },
+  {
+    "prefLabel": "Docker",
+    "x": -0.3,
+    "y": 0.8,
+    "z": -0.5,
+    "subType": "TOOL"
+  },
+  {
+    "prefLabel": "Git",
+    "x": 0.9,
+    "y": 0.1,
+    "z": 0.6,
+    "subType": "TOOL"
+  },
+  {
+    "prefLabel": "Linux",
+    "x": -0.8,
+    "y": -0.4,
+    "z": 0.2,
+    "subType": "OPERATING_SYSTEM"
+  },
+  {
+    "prefLabel": "HTTP",
+    "x": 0.5,
+    "y": 0.9,
+    "z": -0.3,
+    "subType": "PROTOCOL"
+  },
+  {
+    "prefLabel": "REST API",
+    "x": -0.4,
+    "y": -0.5,
+    "z": 0.7,
+    "subType": "TECHNICAL"
+  },
+  {
+    "prefLabel": "Vue.js",
+    "x": 0.7,
+    "y": 0.4,
+    "z": -0.6,
+    "subType": "FRAMEWORK"
+  },
+  {
+    "prefLabel": "PostgreSQL",
+    "x": -0.6,
+    "y": 0.3,
+    "z": 0.4,
+    "subType": "DATABASE"
+  },
+  {
+    "prefLabel": "Kubernetes",
+    "x": 0.3,
+    "y": -0.8,
+    "z": -0.1,
+    "subType": "PLATFORM"
+  },
+  {
+    "prefLabel": "TypeScript",
+    "x": 0.9,
+    "y": 0.5,
+    "z": 0.4,
+    "subType": "PROGRAMMING_LANGUAGE"
+  },
+  {
+    "prefLabel": "AWS",
+    "x": -0.5,
+    "y": -0.1,
+    "z": 0.8,
+    "subType": "PLATFORM"
+  },
+  {
+    "prefLabel": "Agile",
+    "x": 0.3,
+    "y": 1.0,
+    "z": -0.4,
+    "subType": "METHOD"
+  },
+  {
+    "prefLabel": "Machine Learning",
+    "x": -0.9,
+    "y": 0.4,
+    "z": 0.5,
+    "subType": "FUNCTIONAL"
+  },
+  {
+    "prefLabel": "GraphQL",
+    "x": 0.6,
+    "y": -0.4,
+    "z": -0.7,
+    "subType": "PROTOCOL"
+  },
+  {
+    "prefLabel": "Redis",
+    "x": -0.2,
+    "y": 0.8,
+    "z": 0.3,
+    "subType": "DATABASE"
+  },
+  {
+    "prefLabel": "Microservices",
+    "x": 0.4,
+    "y": -0.3,
+    "z": 0.7,
+    "subType": "TECHNICAL"
+  },
+  {
+    "prefLabel": "Angular",
+    "x": 0.8,
+    "y": -0.6,
+    "z": 0.4,
+    "subType": "FRAMEWORK"
+  },
+  {
+    "prefLabel": "Spring Boot",
+    "x": -0.6,
+    "y": 0.5,
+    "z": -0.3,
+    "subType": "FRAMEWORK"
+  },
+  {
+    "prefLabel": "MySQL",
+    "x": 0.4,
+    "y": 0.7,
+    "z": 0.6,
+    "subType": "DATABASE"
+  },
+  {
+    "prefLabel": "Elasticsearch",
+    "x": -0.8,
+    "y": -0.2,
+    "z": 0.4,
+    "subType": "DATABASE"
+  },
+  {
+    "prefLabel": "Jenkins",
+    "x": 0.6,
+    "y": 0.3,
+    "z": -0.5,
+    "subType": "TOOL"
+  },
+  {
+    "prefLabel": "Terraform",
+    "x": -0.3,
+    "y": -0.7,
+    "z": 0.2,
+    "subType": "TOOL"
+  },
+  {
+    "prefLabel": "Ansible",
+    "x": 0.9,
+    "y": 0.2,
+    "z": 0.7,
+    "subType": "TOOL"
+  },
+  {
+    "prefLabel": "Prometheus",
+    "x": -0.7,
+    "y": 0.9,
+    "z": -0.3,
+    "subType": "TOOL"
+  },
+  {
+    "prefLabel": "Grafana",
+    "x": 0.2,
+    "y": -0.4,
+    "z": 0.5,
+    "subType": "TOOL"
+  },
+  {
+    "prefLabel": "Nginx",
+    "x": -0.5,
+    "y": 0.6,
+    "z": -0.4,
+    "subType": "TOOL"
+  },
+  {
+    "prefLabel": "Apache",
+    "x": 0.7,
+    "y": -0.3,
+    "z": 0.3,
+    "subType": "TOOL"
+  },
+  {
+    "prefLabel": "Kafka",
+    "x": -0.3,
+    "y": 0.8,
+    "z": 0.4,
+    "subType": "PLATFORM"
+  },
+  {
+    "prefLabel": "RabbitMQ",
+    "x": 0.5,
+    "y": 0.1,
+    "z": -0.6,
+    "subType": "PLATFORM"
+  },
+  {
+    "prefLabel": "Cassandra",
+    "x": -0.8,
+    "y": -0.5,
+    "z": 0.3,
+    "subType": "DATABASE"
+  },
+  {
+    "prefLabel": "Spark",
+    "x": 0.4,
+    "y": 0.8,
+    "z": -0.2,
+    "subType": "PLATFORM"
+  },
+  {
+    "prefLabel": "Hadoop",
+    "x": -0.4,
+    "y": 0.3,
+    "z": 0.6,
+    "subType": "PLATFORM"
+  },
+  {
+    "prefLabel": "TensorFlow",
+    "x": 0.9,
+    "y": -0.1,
+    "z": 0.4,
+    "subType": "FRAMEWORK"
+  },
+  {
+    "prefLabel": "PyTorch",
+    "x": -0.6,
+    "y": -0.4,
+    "z": -0.5,
+    "subType": "FRAMEWORK"
+  },
+  {
+    "prefLabel": "Scikit-learn",
+    "x": 0.3,
+    "y": 0.6,
+    "z": 0.5,
+    "subType": "FRAMEWORK"
+  },
+  {
+    "prefLabel": "Pandas",
+    "x": -0.7,
+    "y": 0.7,
+    "z": -0.1,
+    "subType": "FRAMEWORK"
+  },
+  {
+    "prefLabel": "NumPy",
+    "x": 0.6,
+    "y": -0.5,
+    "z": 0.6,
+    "subType": "FRAMEWORK"
+  },
+  {
+    "prefLabel": "Matplotlib",
+    "x": -0.4,
+    "y": 0.4,
+    "z": -0.3,
+    "subType": "FRAMEWORK"
+  },
+  {
+    "prefLabel": "Jupyter",
+    "x": 0.8,
+    "y": 0.4,
+    "z": 0.2,
+    "subType": "TOOL"
+  },
+  {
+    "prefLabel": "Selenium",
+    "x": -0.2,
+    "y": -0.6,
+    "z": 0.4,
+    "subType": "TOOL"
+  },
+  {
+    "prefLabel": "Jest",
+    "x": 0.4,
+    "y": 0.9,
+    "z": -0.5,
+    "subType": "TOOL"
+  },
+  {
+    "prefLabel": "Cypress",
+    "x": -0.7,
+    "y": 0.1,
+    "z": 0.3,
+    "subType": "TOOL"
+  },
+  {
+    "prefLabel": "Postman",
+    "x": 0.5,
+    "y": -0.2,
+    "z": -0.4,
+    "subType": "TOOL"
+  },
+  {
+    "prefLabel": "Swagger",
+    "x": -0.3,
+    "y": 0.5,
+    "z": 0.7,
+    "subType": "TOOL"
+  },
+  {
+    "prefLabel": "Jira",
+    "x": 0.6,
+    "y": 0.3,
+    "z": 0.1,
+    "subType": "BUSINESS_SOFTWARE"
+  },
+  {
+    "prefLabel": "Confluence",
+    "x": -0.5,
+    "y": -0.3,
+    "z": -0.6,
+    "subType": "BUSINESS_SOFTWARE"
+  }
+]
