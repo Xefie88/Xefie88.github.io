@@ -13,7 +13,7 @@ scene.createDefaultXRExperienceAsync({
     floorMeshes: [],
     disableTeleportation: true,
     inputOptions: {
-        doNotLoadControllerMeshes: true  // Disable controller meshes completely
+        doNotLoadControllerMeshes: false  // Enable controller meshes
     }
 }).then(xrHelper => {
     console.log("WebXR initialized.");
