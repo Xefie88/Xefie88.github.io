@@ -13,7 +13,7 @@ scene.createDefaultXRExperienceAsync({
     floorMeshes: [],
     disableTeleportation: true,
     inputOptions: {
-        doNotLoadControllerMeshes: false  // Enable controller meshes
+        doNotLoadControllerMeshes: true  // Disable controller meshes completely
     }
 }).then(xrHelper => {
     console.log("WebXR initialized.");
@@ -85,21 +85,21 @@ scene.createDefaultXRExperienceAsync({
         // Create a custom pointer ray if none exists
         if (!controller.pointer || !controller.pointer.isVisible) {
             const isLeft = motionController.handness === 'left';
-            const rayColor = isLeft ? new BABYLON.Color3(0, 1, 0) : new BABYLON.Color3(1, 0, 0);
+            const rayColor = isLeft ? new BABYLON.Color3(0, 0.3, 0) : new BABYLON.Color3(0.3, 0, 0);
             
-            // Create ray mesh
+            // Create ray mesh - invisible but functional
             const ray = BABYLON.MeshBuilder.CreateCylinder("controllerRay_" + motionController.handness, {
                 height: 10,
-                diameterTop: 0.005,
-                diameterBottom: 0.02,
-                tessellation: 8
+                diameterTop: 0.002,
+                diameterBottom: 0.008,
+                tessellation: 6
             }, scene);
             
-            // Create glowing material
+            // Create transparent material
             const rayMaterial = new BABYLON.StandardMaterial("rayMat_" + motionController.handness, scene);
             rayMaterial.emissiveColor = rayColor;
             rayMaterial.disableLighting = true;
-            rayMaterial.alpha = 0.8;
+            rayMaterial.alpha = 0.0; // Completely transparent
             ray.material = rayMaterial;
             
             // Position ray relative to controller
@@ -362,8 +362,8 @@ scene.createDefaultXRExperienceAsync({
                     if (controller.pointer.material) {
                         const isLeft = controller.inputSource.handedness === 'left';
                         controller.pointer.material.emissiveColor = isLeft ?
-                            new BABYLON.Color3(0, 1, 0) : new BABYLON.Color3(1, 0, 0);
-                        controller.pointer.material.alpha = 0.9;
+                            new BABYLON.Color3(0, 0.3, 0) : new BABYLON.Color3(0.3, 0, 0);
+                        controller.pointer.material.alpha = 0.0; // Completely transparent
                         controller.pointer.material.disableLighting = true;
                     }
                     
@@ -511,6 +511,7 @@ function createSimulatedControllers() {
         const leftMat = new BABYLON.StandardMaterial("leftControllerMat", scene);
         leftMat.diffuseColor = new BABYLON.Color3(0, 0.8, 0); // Green
         leftMat.emissiveColor = new BABYLON.Color3(0, 0.5, 0); // Bright glow
+        leftMat.alpha = 0.0; // Completely transparent
         leftController.material = leftMat;
         
         // Right controller - red sphere
@@ -520,6 +521,7 @@ function createSimulatedControllers() {
         const rightMat = new BABYLON.StandardMaterial("rightControllerMat", scene);
         rightMat.diffuseColor = new BABYLON.Color3(0.8, 0, 0); // Red
         rightMat.emissiveColor = new BABYLON.Color3(0.5, 0, 0); // Bright glow
+        rightMat.alpha = 0.0; // Completely transparent
         rightController.material = rightMat;
         
         // Create static pointer rays using boxes (more stable than lines)
@@ -531,9 +533,9 @@ function createSimulatedControllers() {
         leftRay.position = leftController.position.add(new BABYLON.Vector3(0, 0, 4));
         
         const leftRayMat = new BABYLON.StandardMaterial("leftRayMat", scene);
-        leftRayMat.emissiveColor = new BABYLON.Color3(0, 1, 0); // Bright green
+        leftRayMat.emissiveColor = new BABYLON.Color3(0, 0.3, 0); // Dimmed green
         leftRayMat.disableLighting = true;
-        leftRayMat.alpha = 0.8;
+        leftRayMat.alpha = 0.0; // Completely transparent
         leftRay.material = leftRayMat;
         
         const rightRay = BABYLON.MeshBuilder.CreateBox("rightRay", {
@@ -544,9 +546,9 @@ function createSimulatedControllers() {
         rightRay.position = rightController.position.add(new BABYLON.Vector3(0, 0, 4));
         
         const rightRayMat = new BABYLON.StandardMaterial("rightRayMat", scene);
-        rightRayMat.emissiveColor = new BABYLON.Color3(1, 0, 0); // Bright red
+        rightRayMat.emissiveColor = new BABYLON.Color3(0.3, 0, 0); // Dimmed red
         rightRayMat.disableLighting = true;
-        rightRayMat.alpha = 0.8;
+        rightRayMat.alpha = 0.0; // Completely transparent
         rightRay.material = rightRayMat;
         
         // Parent rays to controllers for synchronized movement
@@ -581,10 +583,9 @@ function createSimulatedControllers() {
                 leftController.rotation.y = Math.sin(animTime * 0.5) * 0.3;
                 rightController.rotation.y = Math.sin(animTime * 0.5 + Math.PI) * 0.3;
                 
-                // Pulsing glow effect
-                const pulse = 0.5 + Math.sin(animTime * 3) * 0.3;
-                leftRayMat.alpha = pulse;
-                rightRayMat.alpha = pulse;
+                // Keep transparent - no pulsing effect
+                leftRayMat.alpha = 0.0;
+                rightRayMat.alpha = 0.0;
             }
         });
         
