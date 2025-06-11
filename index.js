@@ -40,6 +40,13 @@ let blinkCount = 0;
 let frameCounter = 0;
 const frameThreshold = 20; // Ajustez ce nombre pour changer la fréquence
 
+// Variables pour le mode démo
+let demoModeActive = false;
+let demoInterval = null;
+let currentDemoGroupIndex = 0;
+let demoGroups = [];
+const demoPauseDuration = 3000; // 3 secondes de pause à chaque groupe
+
 //var font = "Calibri 20px monospace";
 
 const scatter = new BABYLON.PointsCloudSystem("scatter", 0, scene);
@@ -308,6 +315,14 @@ document.addEventListener("DOMContentLoaded", function() {
         searchInput.addEventListener('change', function(event) {
 			const spriteName = document.getElementById('searchInput').value;
             moveCameraToSprite(spriteName);
+        });
+    }
+
+    // Event listener pour le bouton mode démo
+    const demoModeButton = document.getElementById('demoModeButton');
+    if (demoModeButton) {
+        demoModeButton.addEventListener('click', function() {
+            toggleDemoMode();
         });
     }
 
@@ -665,19 +680,27 @@ function moveCameraToSprite(spriteName) {
 
 
 		const moveDistance = BABYLON.Vector3.Distance(cameraStartPosition, adjustedTargetPosition);
-		const numberOfFrames = Math.min(85,Math.max(10,Math.round(moveDistance)));
+		const numberOfFrames = Math.min(300,Math.max(60,Math.round(moveDistance * 4)));
 		
-		// Create animation for camera position
-        const animCamPosition = new BABYLON.Animation("animCamPosition", "position", 10, BABYLON.Animation.ANIMATIONTYPE_VECTOR3, BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT);
-        animCamPosition.setKeys([{frame: 0, value: cameraStartPosition},{frame: numberOfFrames, value: adjustedTargetPosition}]);
+		// Create animation for camera position (encore plus ralenti avec 15 fps)
+		      const animCamPosition = new BABYLON.Animation("animCamPosition", "position", 15, BABYLON.Animation.ANIMATIONTYPE_VECTOR3, BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT);
+		      animCamPosition.setKeys([{frame: 0, value: cameraStartPosition},{frame: numberOfFrames, value: adjustedTargetPosition}]);
 
-        // Create animation for camera target
-        const animCamTarget = new BABYLON.Animation("animCamTarget", "target", 10, BABYLON.Animation.ANIMATIONTYPE_VECTOR3, BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT);
-        animCamTarget.setKeys([{frame: 0, value: cameraStartTarget},{  frame: numberOfFrames, value: targetPosition}]);
+		      // Create animation for camera target (encore plus ralenti avec 15 fps)
+		      const animCamTarget = new BABYLON.Animation("animCamTarget", "target", 15, BABYLON.Animation.ANIMATIONTYPE_VECTOR3, BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT);
+		      animCamTarget.setKeys([{frame: 0, value: cameraStartTarget},{  frame: numberOfFrames, value: targetPosition}]);
 
-        scene.beginDirectAnimation(camera, [animCamPosition, animCamTarget], 0, numberOfFrames, false);
-
+        // Démarrer l'animation et attendre qu'elle se termine avant la pause
+        const animationGroup = scene.beginDirectAnimation(camera, [animCamPosition, animCamTarget], 0, numberOfFrames, false);
+        
         blinkSprite(targetSprite);
+        
+        // Retourner la promesse d'animation pour pouvoir attendre sa fin
+        return new Promise((resolve) => {
+            animationGroup.onAnimationEndObservable.addOnce(() => {
+                resolve();
+            });
+        });
 
         // Find the nearest particles
         let distances = sprites.filter(s => s.isVisible).map(sprite => {
@@ -814,6 +837,102 @@ function decryptData(encryptedData, password) {
         console.error(e);
         return null;
     }
+}
+
+// Fonctions pour le mode démo
+function toggleDemoMode() {
+    if (demoModeActive) {
+        stopDemoMode();
+    } else {
+        startDemoMode();
+    }
+}
+
+function startDemoMode() {
+    if (!scene.spriteManagers[0] || !scene.spriteManagers[0].sprites.length) {
+        alert('Aucune étoile disponible pour le mode démo');
+        return;
+    }
+
+    demoModeActive = true;
+    const demoButton = document.getElementById('demoModeButton');
+    demoButton.textContent = 'Arrêter Démo';
+    demoButton.style.backgroundColor = '#dc3545'; // Rouge pour arrêter
+
+    createDemoGroups();
+    currentDemoGroupIndex = 0;
+    nextDemoGroup();
+}
+
+function stopDemoMode() {
+    demoModeActive = false;
+    const demoButton = document.getElementById('demoModeButton');
+    demoButton.textContent = 'Mode Démo';
+    demoButton.style.backgroundColor = '#28a745'; // Vert pour démarrer
+
+    if (demoInterval) {
+        clearTimeout(demoInterval);
+        demoInterval = null;
+    }
+    
+    currentDemoGroupIndex = 0;
+    console.log('Mode démo arrêté');
+}
+
+function createDemoGroups() {
+    // Créer des groupes d'étoiles basés sur les types (subType)
+    const sprites = scene.spriteManagers[0].sprites.filter(s => s.isVisible);
+    const groupsByType = {};
+    
+    sprites.forEach(sprite => {
+        const subType = sprite.metadata ? sprite.metadata.subType : 'DEFAULT';
+        if (!groupsByType[subType]) {
+            groupsByType[subType] = [];
+        }
+        groupsByType[subType].push(sprite);
+    });
+
+    // Convertir en tableau de groupes et prendre quelques étoiles représentatives de chaque type
+    demoGroups = [];
+    Object.keys(groupsByType).forEach(subType => {
+        const spritesOfType = groupsByType[subType];
+        // Prendre jusqu'à 3 étoiles par type pour éviter trop de longueur
+        const selectedSprites = spritesOfType.slice(0, Math.min(3, spritesOfType.length));
+        
+        selectedSprites.forEach(sprite => {
+            demoGroups.push({
+                sprite: sprite,
+                groupName: subType
+            });
+        });
+    });
+
+    console.log(`Mode démo créé avec ${demoGroups.length} étoiles dans ${Object.keys(groupsByType).length} groupes`);
+}
+
+async function nextDemoGroup() {
+    if (!demoModeActive || currentDemoGroupIndex >= demoGroups.length) {
+        stopDemoMode();
+        return;
+    }
+
+    const currentGroup = demoGroups[currentDemoGroupIndex];
+    const spriteName = currentGroup.sprite.name;
+    const groupName = currentGroup.groupName;
+    
+    console.log(`Mode démo: Navigation vers ${spriteName} (groupe: ${groupName}) - ${currentDemoGroupIndex + 1}/${demoGroups.length}`);
+    
+    // Déplacer la caméra vers l'étoile et attendre que l'animation soit terminée
+    await moveCameraToSprite(spriteName);
+    
+    currentDemoGroupIndex++;
+    
+    // Attendre la pause de 3 secondes APRÈS que l'animation soit terminée
+    demoInterval = setTimeout(() => {
+        if (demoModeActive) {
+            nextDemoGroup();
+        }
+    }, demoPauseDuration);
 }
 
 //scene.debugLayer.show()
