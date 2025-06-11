@@ -314,7 +314,7 @@ scene.createDefaultXRExperienceAsync({
         }
     });
 
-    // Toggle panel with X button (Quest 3)
+    // Toggle panel with X button (Quest 3) and handle trigger interactions
     xrHelper.input.onControllerAddedObservable.add(ctrl => {
         ctrl.onMotionControllerInitObservable.add(motionController => {
             if (motionController.handness === 'left') {
@@ -343,7 +343,33 @@ scene.createDefaultXRExperienceAsync({
                     });
                     console.log("Y button configured for demo mode on left controller");
                 }
+                
+                // Trigger interaction pour navigation vers les étoiles (contrôleur gauche)
+                const leftTrigger = motionController.getComponent("xr-standard-trigger");
+                if (leftTrigger) {
+                    leftTrigger.onButtonStateChangedObservable.add(() => {
+                        if (leftTrigger.pressed) {
+                            handleVRTriggerInteraction(ctrl, 'left');
+                        }
+                    });
+                    console.log("Left trigger configured for star navigation");
+                }
             }
+            
+            // Contrôleur droit
+            if (motionController.handness === 'right') {
+                // Trigger interaction pour navigation vers les étoiles (contrôleur droit)
+                const rightTrigger = motionController.getComponent("xr-standard-trigger");
+                if (rightTrigger) {
+                    rightTrigger.onButtonStateChangedObservable.add(() => {
+                        if (rightTrigger.pressed) {
+                            handleVRTriggerInteraction(ctrl, 'right');
+                        }
+                    });
+                    console.log("Right trigger configured for star navigation");
+                }
+            }
+            
             // Add left joystick up/down to z translation
             const thumbstick = motionController.getComponent("xr-standard-thumbstick");
             if (thumbstick) {
@@ -1354,6 +1380,78 @@ async function nextDemoGroupVR() {
             nextDemoGroupVR();
         }
     }, demoPauseDuration);
+}
+
+// Fonction pour gérer l'interaction trigger VR avec les étoiles
+function handleVRTriggerInteraction(controller, handedness) {
+    console.log(`VR Trigger pressed on ${handedness} controller`);
+    
+    // Vérifier si nous avons des sprites chargés
+    if (!scene.spriteManagers[0] || !scene.spriteManagers[0].sprites.length) {
+        console.log("No sprites loaded for VR interaction");
+        return;
+    }
+    
+    // Obtenir la position et direction du contrôleur
+    let controllerPosition, controllerForward;
+    
+    if (controller.motionController && controller.motionController.rootMesh) {
+        controllerPosition = controller.motionController.rootMesh.getAbsolutePosition();
+        controllerForward = controller.motionController.rootMesh.getDirection(BABYLON.Vector3.Forward());
+    } else {
+        console.log("Controller mesh not available, using fallback");
+        return;
+    }
+    
+    // Créer un rayon depuis le contrôleur
+    const ray = new BABYLON.Ray(controllerPosition, controllerForward);
+    const maxDistance = 1000; // Distance maximale de détection
+    
+    // Variables pour trouver l'étoile la plus proche
+    let closestSprite = null;
+    let closestDistance = Infinity;
+    
+    // Parcourir toutes les étoiles visibles pour trouver celle pointée
+    scene.spriteManagers[0].sprites.forEach(sprite => {
+        if (!sprite.isVisible) return;
+        
+        // Calculer la distance entre le rayon et la position de l'étoile
+        const spritePosition = sprite.position;
+        const rayToSprite = spritePosition.subtract(controllerPosition);
+        const projectionLength = BABYLON.Vector3.Dot(rayToSprite, controllerForward);
+        
+        // Vérifier si l'étoile est devant le contrôleur
+        if (projectionLength > 0 && projectionLength < maxDistance) {
+            const projectedPoint = controllerPosition.add(controllerForward.scale(projectionLength));
+            const distanceToRay = BABYLON.Vector3.Distance(spritePosition, projectedPoint);
+            
+            // Seuil de tolérance pour considérer qu'on "pointe" l'étoile (ajustable)
+            const tolerance = 2.0; // Rayon de détection autour de l'étoile
+            
+            if (distanceToRay < tolerance && projectionLength < closestDistance) {
+                closestSprite = sprite;
+                closestDistance = projectionLength;
+            }
+        }
+    });
+    
+    // Si une étoile est trouvée, naviguer vers elle
+    if (closestSprite) {
+        console.log(`VR Trigger: Navigating to star: ${closestSprite.name}`);
+        
+        // Mettre à jour l'input de recherche si disponible
+        if (typeof searchInput !== 'undefined' && searchInput) {
+            searchInput.value = closestSprite.name;
+        }
+        
+        // Naviguer vers l'étoile
+        moveCameraToSprite(closestSprite.name);
+        
+        // Feedback visuel/audio optionnel
+        console.log(`Successfully triggered navigation to: ${closestSprite.name} (${closestSprite.metadata.subType})`);
+    } else {
+        console.log("VR Trigger: No star detected in pointing direction");
+    }
 }
 
 //scene.debugLayer.show()
