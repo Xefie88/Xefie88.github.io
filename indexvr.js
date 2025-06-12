@@ -1387,83 +1387,115 @@ function handleVRTriggerInteraction(controller, handness) {
     console.log(`VR Trigger pressed on ${handness} controller`);
     
     try {
-        // Obtenir la position et direction du contrôleur
+        // Méthode 1: Utiliser le système de pointer selection de Babylon.js
+        if (controller.pointer && controller.pointer.isVisible) {
+            // Obtenir la direction du pointer ray
+            const rayOrigin = controller.pointer.absolutePosition || controller.pointer.position;
+            const rayDirection = controller.pointer.getDirection(BABYLON.Vector3.Forward());
+            
+            console.log(`VR Debug: Ray origin: ${rayOrigin.toString()}, direction: ${rayDirection.toString()}`);
+            
+            // Créer un ray précis depuis le pointer
+            const ray = new BABYLON.Ray(rayOrigin, rayDirection, 1000);
+            
+            // Variables pour trouver la particule la plus proche
+            let closestSprite = null;
+            let closestDistance = Infinity;
+            
+            // Vérifier toutes les particules visibles
+            if (scene.spriteManagers[0] && scene.spriteManagers[0].sprites) {
+                scene.spriteManagers[0].sprites.forEach(sprite => {
+                    if (sprite.isVisible) {
+                        // Utiliser la méthode intersectsMesh pour la détection précise
+                        const spritePosition = sprite.position;
+                        
+                        // Calculer la distance minimale entre le ray et la position de l'étoile
+                        const rayToSprite = spritePosition.subtract(rayOrigin);
+                        const projectionLength = BABYLON.Vector3.Dot(rayToSprite, rayDirection);
+                        
+                        if (projectionLength > 0) { // L'étoile est devant le ray
+                            const closestPointOnRay = rayOrigin.add(rayDirection.scale(projectionLength));
+                            const distanceToRay = BABYLON.Vector3.Distance(spritePosition, closestPointOnRay);
+                            
+                            // Seuil de sélection plus serré pour plus de précision
+                            const selectionRadius = 1.5;
+                            
+                            if (distanceToRay < selectionRadius && projectionLength < closestDistance) {
+                                closestSprite = sprite;
+                                closestDistance = projectionLength;
+                                console.log(`VR Debug: Candidat trouvé: ${sprite.name}, distance: ${distanceToRay.toFixed(2)}, projection: ${projectionLength.toFixed(2)}`);
+                            }
+                        }
+                    }
+                });
+            }
+            
+            // Si une particule a été trouvée, naviguer vers elle
+            if (closestSprite) {
+                console.log(`VR: ✅ Particule précise trouvée: ${closestSprite.name}`);
+                moveCameraToSprite(closestSprite.name);
+                return;
+            }
+        }
+        
+        // Méthode 2: Fallback - utiliser la position du contrôleur directement
         let controllerPosition, controllerForward;
         
-        if (controller.grip) {
-            // Utiliser la position du grip si disponible
+        // Essayer d'obtenir la position du contrôleur par différentes méthodes
+        if (controller.grip && controller.grip.position) {
             controllerPosition = controller.grip.position;
-            controllerForward = controller.grip.forward || new BABYLON.Vector3(0, 0, 1);
-        } else if (controller.pointer) {
-            // Utiliser le pointer comme fallback
-            controllerPosition = controller.pointer.position;
-            controllerForward = controller.pointer.forward || new BABYLON.Vector3(0, 0, 1);
+            controllerForward = controller.grip.getDirection ?
+                controller.grip.getDirection(BABYLON.Vector3.Forward()) :
+                new BABYLON.Vector3(0, 0, 1);
+        } else if (controller.motionController && controller.motionController.rootMesh) {
+            controllerPosition = controller.motionController.rootMesh.position;
+            controllerForward = controller.motionController.rootMesh.getDirection ?
+                controller.motionController.rootMesh.getDirection(BABYLON.Vector3.Forward()) :
+                new BABYLON.Vector3(0, 0, 1);
         } else {
-            console.log("Impossible d'obtenir la position du contrôleur");
+            console.log("VR: Impossible d'obtenir la position du contrôleur");
             return;
         }
         
-        // Créer un ray depuis le contrôleur
-        const rayLength = 100; // Distance max de détection
-        const ray = new BABYLON.Ray(controllerPosition, controllerForward, rayLength);
+        console.log(`VR Debug Fallback: Position: ${controllerPosition.toString()}, Direction: ${controllerForward.toString()}`);
         
-        // Variables pour trouver la particule la plus proche
+        // Variables pour la sélection
         let closestSprite = null;
-        let closestDistance = Infinity;
+        let closestScreenDistance = Infinity;
         
-        // Vérifier toutes les particules visibles
+        // Méthode alternative: trouver l'étoile la plus proche visuellement
         if (scene.spriteManagers[0] && scene.spriteManagers[0].sprites) {
+            const camera = scene.activeCamera;
             scene.spriteManagers[0].sprites.forEach(sprite => {
                 if (sprite.isVisible) {
-                    // Calculer la distance du ray à la particule
-                    const spritePosition = sprite.position;
-                    const rayToSprite = spritePosition.subtract(controllerPosition);
+                    // Calculer la distance 3D au contrôleur
+                    const distance3D = BABYLON.Vector3.Distance(controllerPosition, sprite.position);
                     
-                    // Projection du vecteur rayToSprite sur la direction du ray
-                    const projection = BABYLON.Vector3.Dot(rayToSprite, controllerForward);
-                    
-                    if (projection > 0) { // La particule est devant le contrôleur
-                        // Point sur le ray le plus proche de la particule
-                        const closestPointOnRay = controllerPosition.add(controllerForward.scale(projection));
-                        const distanceToRay = BABYLON.Vector3.Distance(spritePosition, closestPointOnRay);
+                    // Vérifier si l'étoile est dans une zone raisonnable
+                    if (distance3D < 50) { // Dans un rayon de 50 unités
+                        // Calculer l'angle entre la direction du contrôleur et l'étoile
+                        const toSprite = sprite.position.subtract(controllerPosition).normalize();
+                        const angle = Math.acos(BABYLON.Vector3.Dot(controllerForward, toSprite));
                         
-                        // Seuil de tolérance pour la sélection (rayon de "visée")
-                        const selectionRadius = 2.0; // Ajustez cette valeur selon vos besoins
+                        // Seuil d'angle (plus petit = plus précis)
+                        const maxAngle = Math.PI / 12; // 15 degrés
                         
-                        if (distanceToRay < selectionRadius && projection < closestDistance) {
+                        if (angle < maxAngle && distance3D < closestScreenDistance) {
                             closestSprite = sprite;
-                            closestDistance = projection;
+                            closestScreenDistance = distance3D;
+                            console.log(`VR Debug Fallback: Candidat ${sprite.name}, angle: ${(angle * 180 / Math.PI).toFixed(1)}°, distance: ${distance3D.toFixed(2)}`);
                         }
                     }
                 }
             });
         }
         
-        // Si une particule a été trouvée, naviguer vers elle
+        // Naviguer vers la particule trouvée
         if (closestSprite) {
-            console.log(`VR: Particule visée trouvée: ${closestSprite.name}`);
-            
-            // Équivalent du clic - mettre à jour la recherche et naviguer
-            if (typeof moveCameraToSprite === 'function') {
-                // Mettre à jour l'input de recherche VR si disponible
-                const searchPanels = scene.metadata?.vrSearchInputs;
-                if (searchPanels && searchPanels.inputText) {
-                    searchPanels.inputText.text = closestSprite.name;
-                }
-                
-                // Naviguer vers la particule
-                moveCameraToSprite(closestSprite.name);
-                
-                // Feedback visuel/sonore optionnel
-                console.log(`VR Navigation vers: ${closestSprite.name}`);
-            } else {
-                console.error("Fonction moveCameraToSprite non disponible");
-            }
+            console.log(`VR: ✅ Particule trouvée (fallback): ${closestSprite.name}`);
+            moveCameraToSprite(closestSprite.name);
         } else {
-            console.log(`VR: Aucune particule trouvée dans la direction du ${handness} contrôleur`);
-            
-            // Optionnel: feedback visuel pour indiquer qu'aucune cible n'a été trouvée
-            // Par exemple, un effet de vibration du contrôleur si supporté
+            console.log(`VR: ❌ Aucune particule trouvée dans la direction du ${handness} contrôleur`);
         }
         
     } catch (error) {
