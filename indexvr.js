@@ -1653,10 +1653,7 @@ function detectTargetedSprite() {
             }
         }
         
-        // Mettre à jour la position de l'indicateur VR pour qu'il suive la caméra
-        if (scene.vrTargetIndicator && scene.vrTargetIndicator.updatePosition) {
-            scene.vrTargetIndicator.updatePosition();
-        }
+        // L'indicateur VR simple n'a plus besoin de mise à jour de position
         
     } catch (error) {
         // Erreur silencieuse pour éviter le spam
@@ -1735,104 +1732,123 @@ function handleVRTriggerInteractionNew(controller, handness) {
     }
 }
 
-// Fonction pour créer un indicateur 3D visible en VR immersif
+// Fonction pour créer un indicateur textuel accroché à la caméra VR
 function createVRTargetIndicator(scene) {
-    // Créer un plan 3D pour l'indicateur
-    const targetPlane = BABYLON.MeshBuilder.CreatePlane("vrTargetIndicator", {
-        width: 2,
-        height: 1
-    }, scene);
+    const indicatorSystem = {};
     
-    // Position initiale
-    targetPlane.position = new BABYLON.Vector3(0, -1.5, 4);
-    targetPlane.isVisible = false; // Caché par défaut
+    // Créer un panneau 3D pour afficher l'indicateur de particule visée
+    const targetInfoPlane = BABYLON.MeshBuilder.CreatePlane("vrTargetInfoPlane", {width: 3, height: 1.5}, scene);
     
-    // Ajouter une fonction de mise à jour de position
-    targetPlane.updatePosition = function() {
-        const camera = scene.activeCamera;
-        if (camera) {
-            // Calculer la position devant la caméra
-            const forward = camera.getForwardRay().direction.normalize();
-            const right = BABYLON.Vector3.Cross(forward, camera.upVector).normalize();
-            const up = BABYLON.Vector3.Cross(right, forward).normalize();
-            
-            // Position: 4 mètres devant, 1.5 mètres vers le bas
-            const targetPosition = camera.position
-                .add(forward.scale(4))
-                .add(up.scale(-1.5));
-            
-            targetPlane.position = targetPosition;
-            
-            // Orienter le plan face à la caméra
-            targetPlane.lookAt(camera.position);
-        }
-    };
+    // Position relative à la caméra (HUD style)
+    targetInfoPlane.position = new BABYLON.Vector3(-2, 1, 4); // En haut à gauche dans le champ de vision
+    targetInfoPlane.isVisible = false;
     
     // Créer une texture dynamique pour le texte
-    const targetTexture = new BABYLON.DynamicTexture("vrTargetTexture", {
-        width: 512,
-        height: 256
-    }, scene, true);
+    let infoTexture = new BABYLON.DynamicTexture("vrTargetInfoTexture", {width: 600, height: 300}, scene);
+    const infoMaterial = new BABYLON.StandardMaterial("vrTargetInfoMat", scene);
+    infoMaterial.diffuseTexture = infoTexture;
+    infoMaterial.emissiveTexture = infoTexture;
+    infoMaterial.disableLighting = true;
+    infoMaterial.hasAlpha = true;
+    targetInfoPlane.material = infoMaterial;
     
-    // Matériau pour le plan
-    const targetMaterial = new BABYLON.StandardMaterial("vrTargetMaterial", scene);
-    targetMaterial.diffuseTexture = targetTexture;
-    targetMaterial.emissiveTexture = targetTexture;
-    targetMaterial.disableLighting = true;
-    targetMaterial.hasAlpha = true;
-    targetPlane.material = targetMaterial;
-    
-    // Fonction pour mettre à jour le texte
-    targetPlane.updateText = function(particleName) {
-        // Effacer la texture
-        targetTexture.getContext().clearRect(0, 0, 512, 256);
+    // Fonction pour dessiner l'affichage sur la texture
+    function updateInfoTexture(particleName) {
+        infoTexture.clear();
+        const context = infoTexture.getContext();
         
-        // Fond semi-transparent
-        const ctx = targetTexture.getContext();
-        ctx.fillStyle = "rgba(0, 100, 200, 0.8)";
-        ctx.fillRect(50, 50, 412, 156);
+        // Fond semi-transparent avec bordure
+        context.fillStyle = "rgba(0, 0, 0, 0.8)";
+        context.fillRect(0, 0, 600, 300);
         
         // Bordure
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.9)";
-        ctx.lineWidth = 3;
-        ctx.strokeRect(50, 50, 412, 156);
+        context.strokeStyle = "white";
+        context.lineWidth = 3;
+        context.strokeRect(10, 10, 580, 280);
         
-        // Titre
-        ctx.fillStyle = "white";
-        ctx.font = "bold 32px Arial";
-        ctx.textAlign = "center";
-        ctx.fillText("🎯 CIBLE VR", 256, 100);
+        // Titre "Particule visée"
+        context.font = "bold 36px Arial";
+        context.fillStyle = "yellow";
+        context.textAlign = "center";
+        context.textBaseline = "middle";
+        context.fillText("Particule visée", 300, 100);
+        
+        // Ligne de séparation
+        context.strokeStyle = "yellow";
+        context.lineWidth = 2;
+        context.beginPath();
+        context.moveTo(50, 140);
+        context.lineTo(550, 140);
+        context.stroke();
         
         // Nom de la particule
-        if (particleName && particleName !== "Aucune cible") {
-            ctx.fillStyle = "yellow";
-            ctx.font = "bold 28px Arial";
-            // Tronquer le nom s'il est trop long
-            let displayName = particleName;
-            if (displayName.length > 20) {
-                displayName = displayName.substring(0, 20) + "...";
-            }
-            ctx.fillText(displayName, 256, 150);
-        } else {
-            ctx.fillStyle = "gray";
-            ctx.font = "24px Arial";
-            ctx.fillText("Aucune cible", 256, 150);
-        }
+        context.font = "bold 42px Arial";
+        context.fillStyle = "white";
+        context.strokeStyle = "black";
+        context.lineWidth = 2;
         
-        targetTexture.update();
+        // Contour du nom
+        context.strokeText(particleName, 300, 200);
+        // Texte principal du nom
+        context.fillText(particleName, 300, 200);
+        
+        infoTexture.update();
+    }
+    
+    // Fonction pour attacher le panneau à la caméra
+    function attachToCamera() {
+        const camera = scene.activeCamera;
+        if (camera) {
+            // Attacher le panneau à la caméra comme enfant
+            targetInfoPlane.parent = camera;
+            console.log("VR: Panneau attaché à la caméra");
+        }
+    }
+    
+    // Fonction pour mettre à jour la position du panneau relativement à la caméra
+    function updatePanelPosition() {
+        const camera = scene.activeCamera;
+        if (camera && targetInfoPlane.isVisible) {
+            // Si pas encore attaché, l'attacher
+            if (!targetInfoPlane.parent) {
+                attachToCamera();
+            }
+        }
+    }
+    
+    // Ajouter l'observateur pour maintenir la position
+    scene.onBeforeRenderObservable.add(() => {
+        if (targetInfoPlane.isVisible) {
+            updatePanelPosition();
+        }
+    });
+    
+    // Stocker les références
+    indicatorSystem.infoPane = targetInfoPlane;
+    indicatorSystem.infoTexture = infoTexture;
+    indicatorSystem.infoMaterial = infoMaterial;
+    
+    // Fonctions
+    indicatorSystem.show = function(particleName) {
+        console.log("VR: Showing particle target info for", particleName);
+        targetInfoPlane.isVisible = true;
+        updateInfoTexture(particleName);
+        attachToCamera(); // S'assurer que c'est attaché
     };
     
-    // Fonction pour montrer/cacher l'indicateur
-    targetPlane.show = function(particleName) {
-        targetPlane.updateText(particleName);
-        targetPlane.isVisible = true;
+    indicatorSystem.hide = function() {
+        console.log("VR: Hiding particle target info");
+        targetInfoPlane.isVisible = false;
     };
     
-    targetPlane.hide = function() {
-        targetPlane.isVisible = false;
+    indicatorSystem.dispose = function() {
+        if (infoTexture) infoTexture.dispose();
+        if (infoMaterial) infoMaterial.dispose();
+        if (targetInfoPlane) targetInfoPlane.dispose();
     };
     
-    return targetPlane;
+    console.log("Camera-attached VR text indicator created");
+    return indicatorSystem;
 }
 
 //scene.debugLayer.show()
