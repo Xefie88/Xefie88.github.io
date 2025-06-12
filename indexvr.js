@@ -1737,7 +1737,7 @@ function createVRTargetIndicator(scene) {
     const indicatorSystem = {};
     
     // Créer un panneau 3D pour afficher l'indicateur de particule visée
-    const targetInfoPlane = BABYLON.MeshBuilder.CreatePlane("vrTargetInfoPlane", {width: 1.25, height: 0.6}, scene);
+    const targetInfoPlane = BABYLON.MeshBuilder.CreatePlane("vrTargetInfoPlane", {width: 0.83, height: 0.4}, scene);
     
     // Position relative à la caméra (HUD style) - plus bas
     targetInfoPlane.position = new BABYLON.Vector3(0, -0.8, 3); // Plus bas dans le champ de vision
