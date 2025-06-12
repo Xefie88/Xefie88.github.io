@@ -174,40 +174,8 @@ scene.createDefaultXRExperienceAsync({
         scene.xrScaleTexture.addControl(xrScalePanel);
         scene.xrScalePanel = xrScalePanel;
         
-        // Créer un indicateur de visée VR - sur l'interface principale
-        const xrTargetPanel = new BABYLON.GUI.StackPanel();
-        xrTargetPanel.width = "600px";
-        xrTargetPanel.height = "120px";
-        xrTargetPanel.background = "rgba(255,0,0,0.9)"; // Rouge vif pour VR
-        xrTargetPanel.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_CENTER;
-        xrTargetPanel.verticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_TOP; // En haut
-        xrTargetPanel.isVisible = false;
-        xrTargetPanel.top = "100px"; // 100px du haut
-        xrTargetPanel.paddingTop = "15px";
-        xrTargetPanel.paddingBottom = "15px";
-        
-        const targetLabel = new BABYLON.GUI.TextBlock();
-        targetLabel.text = "🎯 CIBLE VR";
-        targetLabel.height = "40px";
-        targetLabel.color = "white";
-        targetLabel.fontSize = 24;
-        targetLabel.fontWeight = "bold";
-        targetLabel.textVerticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_CENTER;
-        xrTargetPanel.addControl(targetLabel);
-        
-        const targetName = new BABYLON.GUI.TextBlock();
-        targetName.text = "Aucune cible";
-        targetName.height = "60px";
-        targetName.color = "yellow";
-        targetName.fontSize = 28;
-        targetName.fontWeight = "bold";
-        targetName.textVerticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_CENTER;
-        targetName.textWrapping = true;
-        xrTargetPanel.addControl(targetName);
-        
-        scene.xrScaleTexture.addControl(xrTargetPanel);
-        scene.xrTargetPanel = xrTargetPanel;
-        scene.xrTargetName = targetName;
+        // L'indicateur VR 3D sera créé plus tard dans le code
+        scene.vrTargetIndicator = null; // Sera initialisé plus tard
 
         // XR: Toggle scale panel with right A button
         xrHelper.input.onControllerAddedObservable.add(ctrl => {
@@ -928,9 +896,14 @@ engine.runRenderLoop(renderLoop);
 
 
     createLegend(data);
-	updateParticleList();
-	
-}	
+ updateParticleList();
+ 
+ // Créer l'indicateur VR 3D après le chargement des données
+ if (!scene.vrTargetIndicator) {
+  scene.vrTargetIndicator = createVRTargetIndicator(scene);
+ }
+ 
+}
 
 const showPasswordModal = () => {
     return new Promise((resolve) => {
@@ -1668,18 +1641,15 @@ function detectTargetedSprite() {
             
             currentTargetedSprite = targetedSprite;
             
-            // Mettre à jour l'indicateur VR
-            if (scene.xrTargetPanel && scene.xrTargetName) {
-                scene.xrTargetPanel.isVisible = true;
-                scene.xrTargetName.text = targetedSprite.name;
-                scene.xrTargetName.color = "yellow";
+            // Mettre à jour l'indicateur 3D VR avec vérification de sécurité
+            if (scene.vrTargetIndicator && scene.vrTargetIndicator.show) {
+                scene.vrTargetIndicator.show(targetedSprite.name);
             }
         } else {
             // Aucune cible
-            if (scene.xrTargetPanel && scene.xrTargetName) {
-                scene.xrTargetPanel.isVisible = false;
-                scene.xrTargetName.text = "Aucune cible";
-                scene.xrTargetName.color = "gray";
+            currentTargetedSprite = null;
+            if (scene.vrTargetIndicator && scene.vrTargetIndicator.hide) {
+                scene.vrTargetIndicator.hide();
             }
         }
         
@@ -1758,6 +1728,86 @@ function handleVRTriggerInteractionNew(controller, handness) {
     } catch (error) {
         console.error(`Erreur trigger ${handness}:`, error);
     }
+}
+
+// Fonction pour créer un indicateur 3D visible en VR immersif
+function createVRTargetIndicator(scene) {
+    // Créer un plan 3D pour l'indicateur
+    const targetPlane = BABYLON.MeshBuilder.CreatePlane("vrTargetIndicator", {
+        width: 3,
+        height: 1.5
+    }, scene);
+    
+    // Positionner le plan devant la caméra (position fixe)
+    targetPlane.position = new BABYLON.Vector3(0, 2, 5);
+    targetPlane.billboardMode = BABYLON.AbstractMesh.BILLBOARDMODE_ALL; // Toujours face à la caméra
+    targetPlane.isVisible = false; // Caché par défaut
+    
+    // Créer une texture dynamique pour le texte
+    const targetTexture = new BABYLON.DynamicTexture("vrTargetTexture", {
+        width: 512,
+        height: 256
+    }, scene, true);
+    
+    // Matériau pour le plan
+    const targetMaterial = new BABYLON.StandardMaterial("vrTargetMaterial", scene);
+    targetMaterial.diffuseTexture = targetTexture;
+    targetMaterial.emissiveTexture = targetTexture;
+    targetMaterial.disableLighting = true;
+    targetMaterial.hasAlpha = true;
+    targetPlane.material = targetMaterial;
+    
+    // Fonction pour mettre à jour le texte
+    targetPlane.updateText = function(particleName) {
+        // Effacer la texture
+        targetTexture.getContext().clearRect(0, 0, 512, 256);
+        
+        // Fond semi-transparent
+        const ctx = targetTexture.getContext();
+        ctx.fillStyle = "rgba(0, 100, 200, 0.8)";
+        ctx.fillRect(50, 50, 412, 156);
+        
+        // Bordure
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.9)";
+        ctx.lineWidth = 3;
+        ctx.strokeRect(50, 50, 412, 156);
+        
+        // Titre
+        ctx.fillStyle = "white";
+        ctx.font = "bold 32px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText("🎯 CIBLE VR", 256, 100);
+        
+        // Nom de la particule
+        if (particleName && particleName !== "Aucune cible") {
+            ctx.fillStyle = "yellow";
+            ctx.font = "bold 28px Arial";
+            // Tronquer le nom s'il est trop long
+            let displayName = particleName;
+            if (displayName.length > 20) {
+                displayName = displayName.substring(0, 20) + "...";
+            }
+            ctx.fillText(displayName, 256, 150);
+        } else {
+            ctx.fillStyle = "gray";
+            ctx.font = "24px Arial";
+            ctx.fillText("Aucune cible", 256, 150);
+        }
+        
+        targetTexture.update();
+    };
+    
+    // Fonction pour montrer/cacher l'indicateur
+    targetPlane.show = function(particleName) {
+        targetPlane.updateText(particleName);
+        targetPlane.isVisible = true;
+    };
+    
+    targetPlane.hide = function() {
+        targetPlane.isVisible = false;
+    };
+    
+    return targetPlane;
 }
 
 //scene.debugLayer.show()
