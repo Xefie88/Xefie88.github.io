@@ -1757,8 +1757,8 @@ function createVRTargetIndicator(scene) {
         infoTexture.clear();
         const context = infoTexture.getContext();
         
-        // Fond semi-transparent avec bordure plus compacte
-        context.fillStyle = "rgba(0, 0, 0, 0.8)";
+        // Fond plus transparent
+        context.fillStyle = "rgba(0, 0, 0, 0.3)";
         context.fillRect(0, 0, 600, 300);
         
         // Bordure plus proche du contenu
@@ -1766,8 +1766,8 @@ function createVRTargetIndicator(scene) {
         context.lineWidth = 2;
         context.strokeRect(30, 30, 540, 240);
         
-        // Titre "Particule visée"
-        context.font = "bold 32px Arial";
+        // Titre "Particule visée" - texte plus grand
+        context.font = "bold 38px Arial";
         context.fillStyle = "yellow";
         context.textAlign = "center";
         context.textBaseline = "middle";
@@ -1781,8 +1781,8 @@ function createVRTargetIndicator(scene) {
         context.lineTo(520, 140);
         context.stroke();
         
-        // Nom de la particule
-        context.font = "bold 38px Arial";
+        // Nom de la particule - texte plus grand
+        context.font = "bold 44px Arial";
         context.fillStyle = "white";
         context.strokeStyle = "black";
         context.lineWidth = 2;
