@@ -115,84 +115,28 @@ scene.createDefaultXRExperienceAsync({
 
     // XR legend panel setup (hidden by default)
 
-    // XR scale slider panel setup (hidden by default)
-    if (typeof BABYLON.GUI !== "undefined") {
-        if (scene.xrScalePanel) {
-            scene.xrScalePanel.dispose();
-        }
-        const xrScalePanel = new BABYLON.GUI.StackPanel();
-        xrScalePanel.width = "500px";
-        xrScalePanel.height = "120px";
-        xrScalePanel.background = "rgba(0,0,0,0.8)";
-        xrScalePanel.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_CENTER;
-        xrScalePanel.verticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_CENTER;
-        xrScalePanel.isVisible = false;
-        xrScalePanel.zIndex = 2000;
-
-        const sliderLabel = new BABYLON.GUI.TextBlock();
-        sliderLabel.text = "Scale: 1.00";
-        sliderLabel.height = "40px";
-        sliderLabel.color = "white";
-        sliderLabel.fontSize = 24;
-        sliderLabel.marginBottom = "10px";
-        xrScalePanel.addControl(sliderLabel);
-
-        const scaleSlider = new BABYLON.GUI.Slider();
-        scaleSlider.minimum = -1;
-        scaleSlider.maximum = 1;
-        scaleSlider.value = 0;
-        scaleSlider.height = "40px";
-        scaleSlider.width = "400px";
-        scaleSlider.color = "#00ff00";
-        scaleSlider.background = "#333";
-        scaleSlider.thumbWidth = "30px";
-        scaleSlider.barOffset = "10px";
-        xrScalePanel.addControl(scaleSlider);
-
-        // n is the scale factor range (e.g., 10)
-        const n = 10;
-        let currentScale = 1;
-
-        scaleSlider.onValueChangedObservable.add(value => {
-            // Map slider value: -1 -> 1/n, 0 -> 1, 1 -> n
-            let scale;
-            if (value < 0) {
-                scale = 1 / (1 + Math.abs(value) * (n - 1));
-            } else if (value > 0) {
-                scale = 1 + value * (n - 1);
-            } else {
-                scale = 1;
-            }
-            currentScale = scale;
-            sliderLabel.text = "Scale: " + scale.toFixed(2);
-
-        });
-
-        if (!scene.xrScaleTexture) {
-            scene.xrScaleTexture = BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI("XRScaleUI");
-        }
-        scene.xrScaleTexture.addControl(xrScalePanel);
-        scene.xrScalePanel = xrScalePanel;
-        
-        // L'indicateur VR 3D sera créé plus tard dans le code
-        scene.vrTargetIndicator = null; // Sera initialisé plus tard
-
-        // XR: Toggle scale panel with right A button
-        xrHelper.input.onControllerAddedObservable.add(ctrl => {
-            ctrl.onMotionControllerInitObservable.add(motionController => {
-                if (motionController.handness === 'right') {
-                    const aButton = motionController.getComponent("a-button");
-                    if (aButton) {
-                        aButton.onButtonStateChangedObservable.add(() => {
-                            if (aButton.pressed) {
-                                xrScalePanel.isVisible = !xrScalePanel.isVisible;
+    // XR scale panel 3D setup (hidden by default)
+    scene.vrScalePanel3D = null; // Sera initialisé plus tard
+    scene.vrTargetIndicator = null; // Sera initialisé plus tard
+    scene.currentScaleValue = 1.0; // Valeur de scale actuelle
+    
+    // XR: Toggle scale panel with right A button
+    xrHelper.input.onControllerAddedObservable.add(ctrl => {
+        ctrl.onMotionControllerInitObservable.add(motionController => {
+            if (motionController.handness === 'right') {
+                const aButton = motionController.getComponent("a-button");
+                if (aButton) {
+                    aButton.onButtonStateChangedObservable.add(() => {
+                        if (aButton.pressed) {
+                            if (scene.vrScalePanel3D) {
+                                scene.vrScalePanel3D.toggle();
                             }
-                        });
-                    }
+                        }
+                    });
                 }
-            });
+            }
         });
-    }
+    });
     if (typeof BABYLON.GUI !== "undefined") {
         if (scene.xrLegendPanel) {
             scene.xrLegendPanel.dispose();
@@ -352,10 +296,12 @@ scene.createDefaultXRExperienceAsync({
                 if (leftTrigger) {
                     leftTrigger.onButtonStateChangedObservable.add(() => {
                         if (leftTrigger.pressed) {
-                            handleVRTriggerInteractionNew(ctrl, 'left');
+                            handleVRTriggerInteractionNew(ctrl, 'left', true); // true = pressed
+                        } else {
+                            handleVRTriggerInteractionNew(ctrl, 'left', false); // false = released
                         }
                     });
-                    console.log("Left trigger configured for star navigation");
+                    console.log("Left trigger configured for star navigation and scale interaction");
                 }
             }
             
@@ -366,10 +312,19 @@ scene.createDefaultXRExperienceAsync({
                 if (rightTrigger) {
                     rightTrigger.onButtonStateChangedObservable.add(() => {
                         if (rightTrigger.pressed) {
-                            handleVRTriggerInteractionNew(ctrl, 'right');
+                            handleVRTriggerInteractionNew(ctrl, 'right', true); // true = pressed
+                        } else {
+                            handleVRTriggerInteractionNew(ctrl, 'right', false); // false = released
                         }
                     });
-                    console.log("Right trigger configured for star navigation");
+                    console.log("Right trigger configured for star navigation and scale interaction");
+                }
+                
+                // Joystick droit pour contrôle du scale
+                const rightThumbstick = motionController.getComponent("xr-standard-thumbstick");
+                if (rightThumbstick) {
+                    window.rightThumbstick = rightThumbstick;
+                    console.log("Right thumbstick configured for scale control");
                 }
             }
             
@@ -431,6 +386,10 @@ const MAX_DEBUG_LOGS = 10; // Limit debug logs to avoid console spam
 
 // Variable globale pour stocker la particule actuellement visée
 let currentTargetedSprite = null;
+
+// Variables pour la gestion du trigger maintenu sur le slider
+let triggerHeldControllers = new Map(); // Stocke l'état des triggers maintenus par contrôleur
+let sliderInteractionActive = false;
 
 scene.onBeforeRenderObservable.add(() => {
     // Détecter la particule visée en continu (fonction définie plus bas)
@@ -526,6 +485,94 @@ scene.onBeforeRenderObservable.add(() => {
             }
         } else if (debugLogCount <= MAX_DEBUG_LOGS) {
             console.log("No left controller found");
+        }
+        
+        // Find right controller pour contrôle du scale
+        const rightController = window.xrHelper.input.controllers.find(c =>
+            c.inputSource && c.inputSource.handedness === "right"
+        );
+        
+        if (rightController && scene.vrScalePanel3D && scene.vrScalePanel3D.plane.isVisible) {
+            // Gérer le joystick droit pour le contrôle du scale
+            if (rightController.motionController) {
+                const componentNames = ["xr-standard-thumbstick", "thumbstick", "trackpad"];
+                
+                for (const name of componentNames) {
+                    const component = rightController.motionController.getComponent(name);
+                    if (component && component.axes && component.axes.length >= 2) {
+                        const xAxis = component.axes[0]; // X axis pour contrôle du scale
+                        
+                        if (Math.abs(xAxis) > 0.05) { // Zone morte réduite
+                            const scaleSpeed = 0.02; // Vitesse d'ajustement du scale
+                            const currentValue = scene.vrScalePanel3D.currentSliderValue || 0;
+                            const newValue = Math.max(-1, Math.min(1, currentValue + xAxis * scaleSpeed));
+                            
+                            scene.vrScalePanel3D.updateScale(newValue);
+                            scene.vrScalePanel3D.currentSliderValue = newValue;
+                            
+                            console.log(`VR SCALE CONTROL - X-axis: ${xAxis.toFixed(2)}, Scale: ${scene.currentScaleValue.toFixed(2)}`);
+                        }
+                        break;
+                    }
+                }
+            }
+            
+            // Method 2: Direct gamepad access pour le joystick droit
+            if (rightController.inputSource.gamepad) {
+                const gamepad = rightController.inputSource.gamepad;
+                if (gamepad.axes && gamepad.axes.length >= 4) {
+                    const rightStickX = gamepad.axes[0]; // Standard right stick X
+                    
+                    if (Math.abs(rightStickX) > 0.05) {
+                        const scaleSpeed = 0.02;
+                        const currentValue = scene.vrScalePanel3D.currentSliderValue || 0;
+                        const newValue = Math.max(-1, Math.min(1, currentValue + rightStickX * scaleSpeed));
+                        
+                        scene.vrScalePanel3D.updateScale(newValue);
+                        scene.vrScalePanel3D.currentSliderValue = newValue;
+                        
+                        console.log(`VR SCALE CONTROL - Gamepad X: ${rightStickX.toFixed(2)}, Scale: ${scene.currentScaleValue.toFixed(2)}`);
+                    }
+                }
+            }
+        }
+        
+        // Gérer l'interaction continue avec le slider quand le trigger est maintenu
+        if (sliderInteractionActive && triggerHeldControllers.size > 0) {
+            for (const [handness, heldController] of triggerHeldControllers) {
+                if (scene.vrScalePanel3D && scene.vrScalePanel3D.plane.isVisible && heldController.pointer) {
+                    const rayOrigin = heldController.pointer.absolutePosition || heldController.pointer.position;
+                    const rayDirection = heldController.pointer.getDirection ?
+                        heldController.pointer.getDirection(BABYLON.Vector3.Forward()) :
+                        new BABYLON.Vector3(0, 0, 1);
+                    
+                    // Créer un ray pour tester l'intersection continue avec le panneau de scale
+                    const ray = new BABYLON.Ray(rayOrigin, rayDirection);
+                    const hit = ray.intersectsMesh(scene.vrScalePanel3D.plane);
+                    
+                    if (hit.hit) {
+                        // Calculer la position relative sur le slider
+                        const localHitPoint = hit.pickedPoint.subtract(scene.vrScalePanel3D.plane.position);
+                        
+                        // Le slider s'étend sur la largeur du panneau
+                        const sliderWidth = 0.75;
+                        const sliderStart = -sliderWidth / 2;
+                        
+                        // Convertir la position X locale en valeur de slider (-1 à 1)
+                        let sliderValue = (localHitPoint.x - sliderStart) / sliderWidth * 2 - 1;
+                        sliderValue = Math.max(-1, Math.min(1, sliderValue)); // Limiter entre -1 et 1
+                        
+                        // Mettre à jour le scale en continu
+                        scene.vrScalePanel3D.updateScale(sliderValue);
+                        scene.vrScalePanel3D.currentSliderValue = sliderValue;
+                        
+                        // Log moins fréquent pour éviter le spam
+                        if (debugLogCount % 30 === 0) { // Log tous les 30 frames
+                            console.log(`VR Scale Drag: ${handness} - Value: ${sliderValue.toFixed(3)}, Scale: ${scene.currentScaleValue.toFixed(2)}x`);
+                        }
+                    }
+                }
+            }
         }
     } else {
         // Not in VR mode - show this message only a few times
@@ -920,7 +967,12 @@ engine.runRenderLoop(renderLoop);
  
  // Créer l'indicateur VR 3D après le chargement des données
  if (!scene.vrTargetIndicator) {
-  scene.vrTargetIndicator = createVRTargetIndicator(scene);
+   scene.vrTargetIndicator = createVRTargetIndicator(scene);
+ }
+ 
+ // Créer le panneau de scale VR 3D
+ if (!scene.vrScalePanel3D) {
+   scene.vrScalePanel3D = createVRScalePanel3D(scene);
  }
  
 }
@@ -1681,11 +1733,64 @@ function detectTargetedSprite() {
 }
 
 // Version améliorée de la fonction trigger qui utilise le contrôleur spécifique
-function handleVRTriggerInteractionNew(controller, handness) {
-    console.log(`VR Trigger NEW pressed on ${handness} controller`);
+function handleVRTriggerInteractionNew(controller, handness, isPressed = true) {
+    const action = isPressed ? "pressed" : "released";
+    console.log(`VR Trigger NEW ${action} on ${handness} controller`);
     
     try {
-        // Trouver la particule visée spécifiquement par CE contrôleur
+        // Gérer l'état du trigger maintenu
+        if (isPressed) {
+            triggerHeldControllers.set(handness, controller);
+        } else {
+            triggerHeldControllers.delete(handness);
+            sliderInteractionActive = false; // Arrêter l'interaction avec le slider
+        }
+        
+        // Vérifier d'abord si on interagit avec le panneau de scale
+        if (isPressed && scene.vrScalePanel3D && scene.vrScalePanel3D.plane.isVisible && controller.pointer) {
+            const rayOrigin = controller.pointer.absolutePosition || controller.pointer.position;
+            const rayDirection = controller.pointer.getDirection ?
+                controller.pointer.getDirection(BABYLON.Vector3.Forward()) :
+                new BABYLON.Vector3(0, 0, 1);
+            
+            // Créer un ray pour tester l'intersection avec le panneau de scale
+            const ray = new BABYLON.Ray(rayOrigin, rayDirection);
+            const hit = ray.intersectsMesh(scene.vrScalePanel3D.plane);
+            
+            if (hit.hit) {
+                console.log(`VR ${handness}: Début interaction avec le panneau de scale`);
+                sliderInteractionActive = true;
+                
+                // Calculer la position relative sur le slider
+                const localHitPoint = hit.pickedPoint.subtract(scene.vrScalePanel3D.plane.position);
+                
+                // Le slider s'étend sur la largeur du panneau (1.2 unités de large)
+                // Le slider lui-même fait environ 0.75 unités de large, centré
+                const sliderWidth = 0.75;
+                const sliderStart = -sliderWidth / 2;
+                const sliderEnd = sliderWidth / 2;
+                
+                // Convertir la position X locale en valeur de slider (-1 à 1)
+                let sliderValue = (localHitPoint.x - sliderStart) / sliderWidth * 2 - 1;
+                sliderValue = Math.max(-1, Math.min(1, sliderValue)); // Limiter entre -1 et 1
+                
+                // Mettre à jour le scale
+                scene.vrScalePanel3D.updateScale(sliderValue);
+                scene.vrScalePanel3D.currentSliderValue = sliderValue;
+                
+                console.log(`VR Scale Slider: Position X: ${localHitPoint.x.toFixed(3)}, Slider Value: ${sliderValue.toFixed(3)}, Scale: ${scene.currentScaleValue.toFixed(2)}x`);
+                
+                // Indiquer que nous avons géré l'interaction avec le scale, pas besoin de chercher des particules
+                return;
+            }
+        }
+        
+        // Si trigger relâché, on arrête l'interaction ici
+        if (!isPressed) {
+            return;
+        }
+        
+        // Si pas d'interaction avec le scale, chercher des particules
         let targetedSprite = null;
         
         // Utiliser uniquement le contrôleur qui a déclenché le trigger
@@ -1869,6 +1974,166 @@ function createVRTargetIndicator(scene) {
     
     console.log("Camera-attached VR text indicator created");
     return indicatorSystem;
+}
+
+// Fonction pour créer un panneau de scale 3D flottant
+function createVRScalePanel3D(scene) {
+    const scalePanelSystem = {};
+    
+    // Créer un panneau 3D pour le contrôle de scale
+    const scaleInfoPlane = BABYLON.MeshBuilder.CreatePlane("vrScalePanelPlane", {width: 1.2, height: 0.8}, scene);
+    
+    // Position relative à la caméra (côté droit)
+    scaleInfoPlane.position = new BABYLON.Vector3(1.5, 0, 3);
+    scaleInfoPlane.isVisible = false;
+    
+    // Créer une texture dynamique pour l'interface de scale
+    let scaleTexture = new BABYLON.DynamicTexture("vrScalePanelTexture", {width: 800, height: 500}, scene);
+    const scaleMaterial = new BABYLON.StandardMaterial("vrScalePanelMat", scene);
+    scaleMaterial.diffuseTexture = scaleTexture;
+    scaleMaterial.emissiveTexture = scaleTexture;
+    scaleMaterial.disableLighting = true;
+    scaleMaterial.hasAlpha = true;
+    scaleInfoPlane.material = scaleMaterial;
+    
+    // Variables de scale
+    let currentSliderValue = 0; // -1 à 1
+    let currentScale = 1.0;
+    const scaleRange = 10; // Facteur de scale max
+    
+    // Fonction pour dessiner l'interface de scale
+    function updateScaleTexture() {
+        scaleTexture.clear();
+        const context = scaleTexture.getContext();
+        
+        // Fond semi-transparent
+        context.fillStyle = "rgba(0, 0, 0, 0.8)";
+        context.fillRect(0, 0, 800, 500);
+        
+        // Bordure
+        context.strokeStyle = "white";
+        context.lineWidth = 3;
+        context.strokeRect(20, 20, 760, 460);
+        
+        // Titre "Scale Control"
+        context.font = "bold 36px Arial";
+        context.fillStyle = "yellow";
+        context.textAlign = "center";
+        context.textBaseline = "middle";
+        context.fillText("Scale Control", 400, 80);
+        
+        // Valeur actuelle
+        context.font = "bold 42px Arial";
+        context.fillStyle = "white";
+        context.fillText(`Scale: ${currentScale.toFixed(2)}x`, 400, 150);
+        
+        // Barre de slider
+        const sliderX = 100;
+        const sliderY = 250;
+        const sliderWidth = 600;
+        const sliderHeight = 20;
+        
+        // Fond du slider
+        context.fillStyle = "#333";
+        context.fillRect(sliderX, sliderY, sliderWidth, sliderHeight);
+        
+        // Bordure du slider
+        context.strokeStyle = "#00ff00";
+        context.lineWidth = 2;
+        context.strokeRect(sliderX, sliderY, sliderWidth, sliderHeight);
+        
+        // Position du curseur (-1 à 1 mappé sur la largeur)
+        const cursorPos = sliderX + (currentSliderValue + 1) * sliderWidth / 2;
+        
+        // Curseur
+        context.fillStyle = "#00ff00";
+        context.fillRect(cursorPos - 10, sliderY - 10, 20, sliderHeight + 20);
+        
+        // Indicateurs de valeurs
+        context.font = "20px Arial";
+        context.fillStyle = "white";
+        context.textAlign = "left";
+        context.fillText("0.1x", sliderX - 30, sliderY + 50);
+        context.textAlign = "center";
+        context.fillText("1.0x", sliderX + sliderWidth/2, sliderY + 50);
+        context.textAlign = "right";
+        context.fillText("10x", sliderX + sliderWidth + 30, sliderY + 50);
+        
+        // Instructions
+        context.font = "24px Arial";
+        context.fillStyle = "cyan";
+        context.textAlign = "center";
+        context.fillText("Joystick droit: Ajuster scale", 400, 350);
+        context.fillText("Bouton A: Fermer", 400, 390);
+        
+        scaleTexture.update();
+    }
+    
+    // Fonction pour attacher le panneau à la caméra
+    function attachToCamera() {
+        const camera = scene.activeCamera;
+        if (camera) {
+            scaleInfoPlane.parent = camera;
+            console.log("VR: Panneau de scale attaché à la caméra");
+        }
+    }
+    
+    // Fonction pour mettre à jour la valeur de scale
+    function updateScale(sliderValue) {
+        currentSliderValue = Math.max(-1, Math.min(1, sliderValue));
+        
+        // Mapper la valeur du slider vers l'échelle
+        if (currentSliderValue < 0) {
+            currentScale = 1 / (1 + Math.abs(currentSliderValue) * (scaleRange - 1));
+        } else if (currentSliderValue > 0) {
+            currentScale = 1 + currentSliderValue * (scaleRange - 1);
+        } else {
+            currentScale = 1;
+        }
+        
+        scene.currentScaleValue = currentScale;
+        updateScaleTexture();
+    }
+    
+    // Stocker les références
+    scalePanelSystem.plane = scaleInfoPlane;
+    scalePanelSystem.texture = scaleTexture;
+    scalePanelSystem.material = scaleMaterial;
+    
+    // Fonctions
+    scalePanelSystem.show = function() {
+        console.log("VR: Showing scale panel");
+        scaleInfoPlane.isVisible = true;
+        updateScaleTexture();
+        attachToCamera();
+    };
+    
+    scalePanelSystem.hide = function() {
+        console.log("VR: Hiding scale panel");
+        scaleInfoPlane.isVisible = false;
+    };
+    
+    scalePanelSystem.toggle = function() {
+        if (scaleInfoPlane.isVisible) {
+            this.hide();
+        } else {
+            this.show();
+        }
+    };
+    
+    scalePanelSystem.updateScale = updateScale;
+    
+    scalePanelSystem.dispose = function() {
+        if (scaleTexture) scaleTexture.dispose();
+        if (scaleMaterial) scaleMaterial.dispose();
+        if (scaleInfoPlane) scaleInfoPlane.dispose();
+    };
+    
+    // Initialiser avec la valeur par défaut
+    updateScale(0);
+    
+    console.log("Camera-attached VR scale panel 3D created");
+    return scalePanelSystem;
 }
 
 //scene.debugLayer.show()
