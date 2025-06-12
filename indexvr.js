@@ -1734,13 +1734,16 @@ function handleVRTriggerInteractionNew(controller, handness) {
 function createVRTargetIndicator(scene) {
     // Créer un plan 3D pour l'indicateur
     const targetPlane = BABYLON.MeshBuilder.CreatePlane("vrTargetIndicator", {
-        width: 3,
-        height: 1.5
+        width: 2,
+        height: 1
     }, scene);
     
-    // Positionner le plan devant la caméra (position fixe)
-    targetPlane.position = new BABYLON.Vector3(0, 2, 5);
-    targetPlane.billboardMode = BABYLON.AbstractMesh.BILLBOARDMODE_ALL; // Toujours face à la caméra
+    // Attacher l'indicateur à la caméra pour qu'il suive les mouvements de tête
+    targetPlane.parent = scene.activeCamera;
+    
+    // Position relative à la caméra (devant et légèrement en bas)
+    targetPlane.position = new BABYLON.Vector3(0, -1.5, 4); // Plus proche et plus bas
+    targetPlane.rotation = new BABYLON.Vector3(0, 0, 0); // Pas de rotation supplémentaire
     targetPlane.isVisible = false; // Caché par défaut
     
     // Créer une texture dynamique pour le texte
