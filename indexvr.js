@@ -1739,8 +1739,8 @@ function createVRTargetIndicator(scene) {
     // Créer un panneau 3D pour afficher l'indicateur de particule visée
     const targetInfoPlane = BABYLON.MeshBuilder.CreatePlane("vrTargetInfoPlane", {width: 3, height: 1.5}, scene);
     
-    // Position relative à la caméra (HUD style)
-    targetInfoPlane.position = new BABYLON.Vector3(-2, 1, 4); // En haut à gauche dans le champ de vision
+    // Position relative à la caméra (HUD style) - centré en bas
+    targetInfoPlane.position = new BABYLON.Vector3(0, -2, 3); // En bas au centre dans le champ de vision
     targetInfoPlane.isVisible = false;
     
     // Créer une texture dynamique pour le texte
@@ -1757,32 +1757,32 @@ function createVRTargetIndicator(scene) {
         infoTexture.clear();
         const context = infoTexture.getContext();
         
-        // Fond semi-transparent avec bordure
+        // Fond semi-transparent avec bordure plus compacte
         context.fillStyle = "rgba(0, 0, 0, 0.8)";
         context.fillRect(0, 0, 600, 300);
         
-        // Bordure
+        // Bordure plus proche du contenu
         context.strokeStyle = "white";
-        context.lineWidth = 3;
-        context.strokeRect(10, 10, 580, 280);
+        context.lineWidth = 2;
+        context.strokeRect(30, 30, 540, 240);
         
         // Titre "Particule visée"
-        context.font = "bold 36px Arial";
+        context.font = "bold 32px Arial";
         context.fillStyle = "yellow";
         context.textAlign = "center";
         context.textBaseline = "middle";
         context.fillText("Particule visée", 300, 100);
         
-        // Ligne de séparation
+        // Ligne de séparation plus compacte
         context.strokeStyle = "yellow";
         context.lineWidth = 2;
         context.beginPath();
-        context.moveTo(50, 140);
-        context.lineTo(550, 140);
+        context.moveTo(80, 140);
+        context.lineTo(520, 140);
         context.stroke();
         
         // Nom de la particule
-        context.font = "bold 42px Arial";
+        context.font = "bold 38px Arial";
         context.fillStyle = "white";
         context.strokeStyle = "black";
         context.lineWidth = 2;
