@@ -1382,4 +1382,93 @@ async function nextDemoGroupVR() {
     }, demoPauseDuration);
 }
 
+// Fonction pour gérer l'interaction trigger en VR (équivalent du clic souris)
+function handleVRTriggerInteraction(controller, handness) {
+    console.log(`VR Trigger pressed on ${handness} controller`);
+    
+    try {
+        // Obtenir la position et direction du contrôleur
+        let controllerPosition, controllerForward;
+        
+        if (controller.grip) {
+            // Utiliser la position du grip si disponible
+            controllerPosition = controller.grip.position;
+            controllerForward = controller.grip.forward || new BABYLON.Vector3(0, 0, 1);
+        } else if (controller.pointer) {
+            // Utiliser le pointer comme fallback
+            controllerPosition = controller.pointer.position;
+            controllerForward = controller.pointer.forward || new BABYLON.Vector3(0, 0, 1);
+        } else {
+            console.log("Impossible d'obtenir la position du contrôleur");
+            return;
+        }
+        
+        // Créer un ray depuis le contrôleur
+        const rayLength = 100; // Distance max de détection
+        const ray = new BABYLON.Ray(controllerPosition, controllerForward, rayLength);
+        
+        // Variables pour trouver la particule la plus proche
+        let closestSprite = null;
+        let closestDistance = Infinity;
+        
+        // Vérifier toutes les particules visibles
+        if (scene.spriteManagers[0] && scene.spriteManagers[0].sprites) {
+            scene.spriteManagers[0].sprites.forEach(sprite => {
+                if (sprite.isVisible) {
+                    // Calculer la distance du ray à la particule
+                    const spritePosition = sprite.position;
+                    const rayToSprite = spritePosition.subtract(controllerPosition);
+                    
+                    // Projection du vecteur rayToSprite sur la direction du ray
+                    const projection = BABYLON.Vector3.Dot(rayToSprite, controllerForward);
+                    
+                    if (projection > 0) { // La particule est devant le contrôleur
+                        // Point sur le ray le plus proche de la particule
+                        const closestPointOnRay = controllerPosition.add(controllerForward.scale(projection));
+                        const distanceToRay = BABYLON.Vector3.Distance(spritePosition, closestPointOnRay);
+                        
+                        // Seuil de tolérance pour la sélection (rayon de "visée")
+                        const selectionRadius = 2.0; // Ajustez cette valeur selon vos besoins
+                        
+                        if (distanceToRay < selectionRadius && projection < closestDistance) {
+                            closestSprite = sprite;
+                            closestDistance = projection;
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Si une particule a été trouvée, naviguer vers elle
+        if (closestSprite) {
+            console.log(`VR: Particule visée trouvée: ${closestSprite.name}`);
+            
+            // Équivalent du clic - mettre à jour la recherche et naviguer
+            if (typeof moveCameraToSprite === 'function') {
+                // Mettre à jour l'input de recherche VR si disponible
+                const searchPanels = scene.metadata?.vrSearchInputs;
+                if (searchPanels && searchPanels.inputText) {
+                    searchPanels.inputText.text = closestSprite.name;
+                }
+                
+                // Naviguer vers la particule
+                moveCameraToSprite(closestSprite.name);
+                
+                // Feedback visuel/sonore optionnel
+                console.log(`VR Navigation vers: ${closestSprite.name}`);
+            } else {
+                console.error("Fonction moveCameraToSprite non disponible");
+            }
+        } else {
+            console.log(`VR: Aucune particule trouvée dans la direction du ${handness} contrôleur`);
+            
+            // Optionnel: feedback visuel pour indiquer qu'aucune cible n'a été trouvée
+            // Par exemple, un effet de vibration du contrôleur si supporté
+        }
+        
+    } catch (error) {
+        console.error("Erreur dans handleVRTriggerInteraction:", error);
+    }
+}
+
 //scene.debugLayer.show()
