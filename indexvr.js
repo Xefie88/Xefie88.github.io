@@ -1740,7 +1740,7 @@ function createVRTargetIndicator(scene) {
     const targetInfoPlane = BABYLON.MeshBuilder.CreatePlane("vrTargetInfoPlane", {width: 0.83, height: 0.4}, scene);
     
     // Position relative à la caméra (HUD style) - plus bas
-    targetInfoPlane.position = new BABYLON.Vector3(0, -0.9, 3); // Plus bas dans le champ de vision
+    targetInfoPlane.position = new BABYLON.Vector3(0, -1.0, 3); // Plus bas dans le champ de vision
     targetInfoPlane.isVisible = false;
     
     // Créer une texture dynamique pour le texte
@@ -1757,14 +1757,14 @@ function createVRTargetIndicator(scene) {
         infoTexture.clear();
         const context = infoTexture.getContext();
         
-        // Fond plus transparent
-        context.fillStyle = "rgba(0, 0, 0, 0.3)";
-        context.fillRect(0, 0, 600, 300);
+        // Fond complètement transparent - pas de fond
+        // context.fillStyle = "rgba(0, 0, 0, 0.3)";
+        // context.fillRect(0, 0, 600, 300);
         
-        // Bordure plus proche du contenu
-        context.strokeStyle = "white";
-        context.lineWidth = 2;
-        context.strokeRect(30, 30, 540, 240);
+        // Pas de bordure pour un fond transparent
+        // context.strokeStyle = "white";
+        // context.lineWidth = 2;
+        // context.strokeRect(30, 30, 540, 240);
         
         // Titre "Particule visée" - texte plus grand
         context.font = "bold 38px Arial";
@@ -1773,13 +1773,13 @@ function createVRTargetIndicator(scene) {
         context.textBaseline = "middle";
         context.fillText("Particule visée", 300, 100);
         
-        // Ligne de séparation plus compacte
-        context.strokeStyle = "yellow";
-        context.lineWidth = 2;
-        context.beginPath();
-        context.moveTo(80, 140);
-        context.lineTo(520, 140);
-        context.stroke();
+        // Pas de ligne de séparation avec fond transparent
+        // context.strokeStyle = "yellow";
+        // context.lineWidth = 2;
+        // context.beginPath();
+        // context.moveTo(80, 140);
+        // context.lineTo(520, 140);
+        // context.stroke();
         
         // Nom de la particule - texte plus grand
         context.font = "bold 44px Arial";
