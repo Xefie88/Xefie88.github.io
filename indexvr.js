@@ -173,6 +173,40 @@ scene.createDefaultXRExperienceAsync({
         }
         scene.xrScaleTexture.addControl(xrScalePanel);
         scene.xrScalePanel = xrScalePanel;
+        
+        // Créer un indicateur de visée VR
+        const xrTargetPanel = new BABYLON.GUI.StackPanel();
+        xrTargetPanel.width = "500px";
+        xrTargetPanel.height = "150px"; // Hauteur encore plus grande
+        xrTargetPanel.background = "rgba(0,100,200,0.8)";
+        xrTargetPanel.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_CENTER;
+        xrTargetPanel.verticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_BOTTOM;
+        xrTargetPanel.isVisible = false;
+        xrTargetPanel.paddingBottom = "60px"; // Moins de padding pour plus d'espace
+        xrTargetPanel.paddingTop = "10px"; // Espace en haut
+        
+        const targetLabel = new BABYLON.GUI.TextBlock();
+        targetLabel.text = "🎯 Particule visée";
+        targetLabel.height = "40px"; // Plus de hauteur
+        targetLabel.color = "white";
+        targetLabel.fontSize = 16; // Police plus petite
+        targetLabel.fontWeight = "bold";
+        targetLabel.textVerticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_CENTER;
+        xrTargetPanel.addControl(targetLabel);
+        
+        const targetName = new BABYLON.GUI.TextBlock();
+        targetName.text = "Aucune cible";
+        targetName.height = "60px"; // Plus de hauteur pour le nom
+        targetName.color = "yellow";
+        targetName.fontSize = 20; // Police plus petite
+        targetName.fontWeight = "bold";
+        targetName.textVerticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_CENTER;
+        targetName.textWrapping = true; // Permettre le retour à la ligne
+        xrTargetPanel.addControl(targetName);
+        
+        scene.xrScaleTexture.addControl(xrTargetPanel);
+        scene.xrTargetPanel = xrTargetPanel;
+        scene.xrTargetName = targetName;
 
         // XR: Toggle scale panel with right A button
         xrHelper.input.onControllerAddedObservable.add(ctrl => {
@@ -349,7 +383,7 @@ scene.createDefaultXRExperienceAsync({
                 if (leftTrigger) {
                     leftTrigger.onButtonStateChangedObservable.add(() => {
                         if (leftTrigger.pressed) {
-                            handleVRTriggerInteraction(ctrl, 'left');
+                            handleVRTriggerInteractionNew(ctrl, 'left');
                         }
                     });
                     console.log("Left trigger configured for star navigation");
@@ -363,7 +397,7 @@ scene.createDefaultXRExperienceAsync({
                 if (rightTrigger) {
                     rightTrigger.onButtonStateChangedObservable.add(() => {
                         if (rightTrigger.pressed) {
-                            handleVRTriggerInteraction(ctrl, 'right');
+                            handleVRTriggerInteractionNew(ctrl, 'right');
                         }
                     });
                     console.log("Right trigger configured for star navigation");
@@ -389,6 +423,9 @@ scene.createDefaultXRExperienceAsync({
         
         console.log("Pointer selection feature enabled");
         
+        // Store reference to the pointer feature for accessing selection data
+        window.vrPointerFeature = pointerFeature;
+        
         // Enhance existing pointer rays when they become available
         setTimeout(() => {
             xrHelper.input.controllers.forEach(controller => {
@@ -399,8 +436,8 @@ scene.createDefaultXRExperienceAsync({
                     if (controller.pointer.material) {
                         const isLeft = controller.inputSource.handedness === 'left';
                         controller.pointer.material.emissiveColor = isLeft ?
-                            new BABYLON.Color3(0, 0.3, 0) : new BABYLON.Color3(0.3, 0, 0);
-                        controller.pointer.material.alpha = 0.0; // Completely transparent
+                            new BABYLON.Color3(0, 0.8, 0) : new BABYLON.Color3(0.8, 0, 0);
+                        controller.pointer.material.alpha = 0.8; // Semi-transparent
                         controller.pointer.material.disableLighting = true;
                     }
                     
@@ -423,7 +460,15 @@ scene.clearColor = new BABYLON.Color4(0, 0, 0, 1);
 let debugLogCount = 0;
 const MAX_DEBUG_LOGS = 10; // Limit debug logs to avoid console spam
 
+// Variable globale pour stocker la particule actuellement visée
+let currentTargetedSprite = null;
+
 scene.onBeforeRenderObservable.add(() => {
+    // Détecter la particule visée en continu (fonction définie plus bas)
+    if (typeof detectTargetedSprite === 'function') {
+        detectTargetedSprite();
+    }
+    
     // Check if we're in VR mode and have controllers
     if (window.xrHelper && window.xrHelper.input && window.xrHelper.input.controllers.length > 0) {
         
@@ -923,22 +968,23 @@ document.addEventListener("DOMContentLoaded", function() {
         });
     }
 
+    const searchInput = document.getElementById('searchInput');
     if (searchInput) {
         searchInput.addEventListener('keydown', function(event) {
             if (event.key === 'Enter') {
                 event.preventDefault(); // This prevents any default form submitting
-				const spriteName = document.getElementById('searchInput').value;
-				searchInput.blur();
+    const spriteName = document.getElementById('searchInput').value;
+    searchInput.blur();
                 moveCameraToSprite(spriteName);
             }
         });
-		
-		searchInput.addEventListener('focus', function(event) {
+  
+  searchInput.addEventListener('focus', function(event) {
             searchInput.value = '';
         });
 
         searchInput.addEventListener('change', function(event) {
-			const spriteName = document.getElementById('searchInput').value;
+   const spriteName = document.getElementById('searchInput').value;
             moveCameraToSprite(spriteName);
         });
     }
@@ -1500,6 +1546,171 @@ function handleVRTriggerInteraction(controller, handness) {
         
     } catch (error) {
         console.error("Erreur dans handleVRTriggerInteraction:", error);
+    }
+}
+
+// Cette fonction a été supprimée car dupliquée - voir la version corrigée plus bas
+
+// Fonction pour détecter la particule visée en continu
+function detectTargetedSprite() {
+    try {
+        // Reset previous target
+        if (currentTargetedSprite) {
+            // Restaurer la couleur originale
+            if (currentTargetedSprite.originalColor) {
+                currentTargetedSprite.color = currentTargetedSprite.originalColor;
+            }
+            currentTargetedSprite = null;
+        }
+        
+        let targetedSprite = null;
+        
+        // Méthode 1: Utiliser le système de pointer selection si disponible
+        if (window.xrHelper && window.xrHelper.input && window.xrHelper.input.controllers.length > 0) {
+            for (const controller of window.xrHelper.input.controllers) {
+                if (controller.pointer) {
+                    const rayOrigin = controller.pointer.absolutePosition || controller.pointer.position;
+                    const rayDirection = controller.pointer.getDirection ?
+                        controller.pointer.getDirection(BABYLON.Vector3.Forward()) :
+                        new BABYLON.Vector3(0, 0, 1);
+                    
+                    // Trouver la particule la plus proche du ray
+                    let closestSprite = null;
+                    let closestDistance = Infinity;
+                    
+                    if (scene.spriteManagers[0] && scene.spriteManagers[0].sprites) {
+                        scene.spriteManagers[0].sprites.forEach(sprite => {
+                            if (sprite.isVisible) {
+                                const spritePosition = sprite.position;
+                                const rayToSprite = spritePosition.subtract(rayOrigin);
+                                const projectionLength = BABYLON.Vector3.Dot(rayToSprite, rayDirection);
+                                
+                                if (projectionLength > 0 && projectionLength < 100) {
+                                    const closestPointOnRay = rayOrigin.add(rayDirection.scale(projectionLength));
+                                    const distanceToRay = BABYLON.Vector3.Distance(spritePosition, closestPointOnRay);
+                                    
+                                    if (distanceToRay < 2.0 && projectionLength < closestDistance) {
+                                        closestSprite = sprite;
+                                        closestDistance = projectionLength;
+                                    }
+                                }
+                            }
+                        });
+                    }
+                    
+                    if (closestSprite) {
+                        targetedSprite = closestSprite;
+                        break; // Prendre la première trouvée
+                    }
+                }
+            }
+        }
+        
+        // Méthode 2: Fallback - sprite le plus proche du centre de l'écran
+        if (!targetedSprite && scene.activeCamera) {
+            const camera = scene.activeCamera;
+            const width = engine.getRenderWidth();
+            const height = engine.getRenderHeight();
+            const centerX = width / 2;
+            const centerY = height / 2;
+            
+            let closestSprite = null;
+            let smallestDistance = Infinity;
+            
+            if (scene.spriteManagers[0] && scene.spriteManagers[0].sprites) {
+                scene.spriteManagers[0].sprites.forEach(sprite => {
+                    if (sprite.isVisible) {
+                        const identityMatrix = BABYLON.Matrix.Identity();
+                        const transformMatrix = scene.getTransformMatrix();
+                        const viewport = camera.viewport.toGlobal(width, height);
+                        
+                        const projectedPosition = BABYLON.Vector3.Project(
+                            sprite.position,
+                            identityMatrix,
+                            transformMatrix,
+                            viewport
+                        );
+                        
+                        // Calculer la distance au centre de l'écran
+                        const screenDistance = Math.sqrt(
+                            Math.pow(projectedPosition.x - centerX, 2) +
+                            Math.pow(projectedPosition.y - centerY, 2)
+                        );
+                        
+                        // Vérifier si dans l'écran et proche du centre
+                        if (projectedPosition.x >= 0 && projectedPosition.x <= width &&
+                            projectedPosition.y >= 0 && projectedPosition.y <= height &&
+                            projectedPosition.z > 0 && projectedPosition.z < 1 &&
+                            screenDistance < 100) { // Seuil de 100 pixels du centre
+                            
+                            if (screenDistance < smallestDistance) {
+                                closestSprite = sprite;
+                                smallestDistance = screenDistance;
+                            }
+                        }
+                    }
+                });
+            }
+            
+            targetedSprite = closestSprite;
+        }
+        
+        // Mettre à jour l'affichage
+        if (targetedSprite) {
+            // Sauvegarder la couleur originale si pas déjà fait
+            if (!targetedSprite.originalColor) {
+                targetedSprite.originalColor = targetedSprite.color.clone();
+            }
+            
+            // Changer la couleur pour indiquer la visée
+            targetedSprite.color = new BABYLON.Color4(1, 1, 0, 1); // Jaune vif
+            
+            currentTargetedSprite = targetedSprite;
+            
+            // Mettre à jour l'indicateur VR
+            if (scene.xrTargetPanel && scene.xrTargetName) {
+                scene.xrTargetPanel.isVisible = true;
+                scene.xrTargetName.text = targetedSprite.name;
+                scene.xrTargetName.color = "yellow";
+            }
+        } else {
+            // Aucune cible
+            if (scene.xrTargetPanel && scene.xrTargetName) {
+                scene.xrTargetPanel.isVisible = false;
+                scene.xrTargetName.text = "Aucune cible";
+                scene.xrTargetName.color = "gray";
+            }
+        }
+        
+    } catch (error) {
+        // Erreur silencieuse pour éviter le spam
+    }
+}
+
+// Version améliorée de la fonction trigger qui utilise la cible actuelle
+function handleVRTriggerInteractionNew(controller, handness) {
+    console.log(`VR Trigger NEW pressed on ${handness} controller`);
+    
+    if (currentTargetedSprite) {
+        console.log(`VR: ✅ Navigation vers la cible actuelle: ${currentTargetedSprite.name}`);
+        moveCameraToSprite(currentTargetedSprite.name);
+    } else {
+        console.log(`VR: ❌ Aucune cible actuellement visée`);
+        
+        // Flash de l'indicateur pour montrer qu'il n'y a pas de cible
+        if (scene.xrTargetPanel) {
+            scene.xrTargetPanel.isVisible = true;
+            if (scene.xrTargetName) {
+                scene.xrTargetName.text = "❌ Aucune cible !";
+                scene.xrTargetName.color = "red";
+            }
+            
+            setTimeout(() => {
+                if (scene.xrTargetPanel) {
+                    scene.xrTargetPanel.isVisible = false;
+                }
+            }, 2000);
+        }
     }
 }
 
