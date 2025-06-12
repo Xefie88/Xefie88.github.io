@@ -1740,7 +1740,7 @@ function createVRTargetIndicator(scene) {
     const targetInfoPlane = BABYLON.MeshBuilder.CreatePlane("vrTargetInfoPlane", {width: 0.83, height: 0.4}, scene);
     
     // Position relative à la caméra (HUD style) - plus bas
-    targetInfoPlane.position = new BABYLON.Vector3(0, -0.8, 3); // Plus bas dans le champ de vision
+    targetInfoPlane.position = new BABYLON.Vector3(0, -0.9, 3); // Plus bas dans le champ de vision
     targetInfoPlane.isVisible = false;
     
     // Créer une texture dynamique pour le texte
