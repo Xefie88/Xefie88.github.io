@@ -1653,6 +1653,11 @@ function detectTargetedSprite() {
             }
         }
         
+        // Mettre à jour la position de l'indicateur VR pour qu'il suive la caméra
+        if (scene.vrTargetIndicator && scene.vrTargetIndicator.updatePosition) {
+            scene.vrTargetIndicator.updatePosition();
+        }
+        
     } catch (error) {
         // Erreur silencieuse pour éviter le spam
     }
@@ -1738,13 +1743,30 @@ function createVRTargetIndicator(scene) {
         height: 1
     }, scene);
     
-    // Attacher l'indicateur à la caméra pour qu'il suive les mouvements de tête
-    targetPlane.parent = scene.activeCamera;
-    
-    // Position relative à la caméra (devant et légèrement en bas)
-    targetPlane.position = new BABYLON.Vector3(0, -1.5, 4); // Plus proche et plus bas
-    targetPlane.rotation = new BABYLON.Vector3(0, 0, 0); // Pas de rotation supplémentaire
+    // Position initiale
+    targetPlane.position = new BABYLON.Vector3(0, -1.5, 4);
     targetPlane.isVisible = false; // Caché par défaut
+    
+    // Ajouter une fonction de mise à jour de position
+    targetPlane.updatePosition = function() {
+        const camera = scene.activeCamera;
+        if (camera) {
+            // Calculer la position devant la caméra
+            const forward = camera.getForwardRay().direction.normalize();
+            const right = BABYLON.Vector3.Cross(forward, camera.upVector).normalize();
+            const up = BABYLON.Vector3.Cross(right, forward).normalize();
+            
+            // Position: 4 mètres devant, 1.5 mètres vers le bas
+            const targetPosition = camera.position
+                .add(forward.scale(4))
+                .add(up.scale(-1.5));
+            
+            targetPlane.position = targetPosition;
+            
+            // Orienter le plan face à la caméra
+            targetPlane.lookAt(camera.position);
+        }
+    };
     
     // Créer une texture dynamique pour le texte
     const targetTexture = new BABYLON.DynamicTexture("vrTargetTexture", {
