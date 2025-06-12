@@ -174,34 +174,35 @@ scene.createDefaultXRExperienceAsync({
         scene.xrScaleTexture.addControl(xrScalePanel);
         scene.xrScalePanel = xrScalePanel;
         
-        // Créer un indicateur de visée VR
+        // Créer un indicateur de visée VR - sur l'interface principale
         const xrTargetPanel = new BABYLON.GUI.StackPanel();
-        xrTargetPanel.width = "500px";
-        xrTargetPanel.height = "150px"; // Hauteur encore plus grande
-        xrTargetPanel.background = "rgba(0,100,200,0.8)";
+        xrTargetPanel.width = "600px";
+        xrTargetPanel.height = "120px";
+        xrTargetPanel.background = "rgba(255,0,0,0.9)"; // Rouge vif pour VR
         xrTargetPanel.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_CENTER;
-        xrTargetPanel.verticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_BOTTOM;
+        xrTargetPanel.verticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_TOP; // En haut
         xrTargetPanel.isVisible = false;
-        xrTargetPanel.paddingBottom = "60px"; // Moins de padding pour plus d'espace
-        xrTargetPanel.paddingTop = "10px"; // Espace en haut
+        xrTargetPanel.top = "100px"; // 100px du haut
+        xrTargetPanel.paddingTop = "15px";
+        xrTargetPanel.paddingBottom = "15px";
         
         const targetLabel = new BABYLON.GUI.TextBlock();
-        targetLabel.text = "🎯 Particule visée";
-        targetLabel.height = "40px"; // Plus de hauteur
+        targetLabel.text = "🎯 CIBLE VR";
+        targetLabel.height = "40px";
         targetLabel.color = "white";
-        targetLabel.fontSize = 16; // Police plus petite
+        targetLabel.fontSize = 24;
         targetLabel.fontWeight = "bold";
         targetLabel.textVerticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_CENTER;
         xrTargetPanel.addControl(targetLabel);
         
         const targetName = new BABYLON.GUI.TextBlock();
         targetName.text = "Aucune cible";
-        targetName.height = "60px"; // Plus de hauteur pour le nom
+        targetName.height = "60px";
         targetName.color = "yellow";
-        targetName.fontSize = 20; // Police plus petite
+        targetName.fontSize = 28;
         targetName.fontWeight = "bold";
         targetName.textVerticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_CENTER;
-        targetName.textWrapping = true; // Permettre le retour à la ligne
+        targetName.textWrapping = true;
         xrTargetPanel.addControl(targetName);
         
         scene.xrScaleTexture.addControl(xrTargetPanel);
@@ -1687,30 +1688,75 @@ function detectTargetedSprite() {
     }
 }
 
-// Version améliorée de la fonction trigger qui utilise la cible actuelle
+// Version améliorée de la fonction trigger qui utilise le contrôleur spécifique
 function handleVRTriggerInteractionNew(controller, handness) {
     console.log(`VR Trigger NEW pressed on ${handness} controller`);
     
-    if (currentTargetedSprite) {
-        console.log(`VR: ✅ Navigation vers la cible actuelle: ${currentTargetedSprite.name}`);
-        moveCameraToSprite(currentTargetedSprite.name);
-    } else {
-        console.log(`VR: ❌ Aucune cible actuellement visée`);
+    try {
+        // Trouver la particule visée spécifiquement par CE contrôleur
+        let targetedSprite = null;
         
-        // Flash de l'indicateur pour montrer qu'il n'y a pas de cible
-        if (scene.xrTargetPanel) {
-            scene.xrTargetPanel.isVisible = true;
-            if (scene.xrTargetName) {
-                scene.xrTargetName.text = "❌ Aucune cible !";
-                scene.xrTargetName.color = "red";
+        // Utiliser uniquement le contrôleur qui a déclenché le trigger
+        if (controller.pointer) {
+            const rayOrigin = controller.pointer.absolutePosition || controller.pointer.position;
+            const rayDirection = controller.pointer.getDirection ?
+                controller.pointer.getDirection(BABYLON.Vector3.Forward()) :
+                new BABYLON.Vector3(0, 0, 1);
+            
+            console.log(`VR ${handness}: Ray origin: ${rayOrigin.toString()}, direction: ${rayDirection.toString()}`);
+            
+            // Trouver la particule la plus proche du ray de CE contrôleur
+            let closestSprite = null;
+            let closestDistance = Infinity;
+            
+            if (scene.spriteManagers[0] && scene.spriteManagers[0].sprites) {
+                scene.spriteManagers[0].sprites.forEach(sprite => {
+                    if (sprite.isVisible) {
+                        const spritePosition = sprite.position;
+                        const rayToSprite = spritePosition.subtract(rayOrigin);
+                        const projectionLength = BABYLON.Vector3.Dot(rayToSprite, rayDirection);
+                        
+                        if (projectionLength > 0 && projectionLength < 100) {
+                            const closestPointOnRay = rayOrigin.add(rayDirection.scale(projectionLength));
+                            const distanceToRay = BABYLON.Vector3.Distance(spritePosition, closestPointOnRay);
+                            
+                            if (distanceToRay < 2.0 && projectionLength < closestDistance) {
+                                closestSprite = sprite;
+                                closestDistance = projectionLength;
+                            }
+                        }
+                    }
+                });
             }
             
-            setTimeout(() => {
-                if (scene.xrTargetPanel) {
-                    scene.xrTargetPanel.isVisible = false;
-                }
-            }, 2000);
+            targetedSprite = closestSprite;
         }
+        
+        // Naviguer vers la particule trouvée par CE contrôleur
+        if (targetedSprite) {
+            console.log(`VR ${handness}: ✅ Navigation vers: ${targetedSprite.name}`);
+            moveCameraToSprite(targetedSprite.name);
+        } else {
+            console.log(`VR ${handness}: ❌ Aucune cible trouvée pour ce contrôleur`);
+            
+            // Flash de l'indicateur pour montrer qu'il n'y a pas de cible
+            if (scene.xrTargetPanel) {
+                scene.xrTargetPanel.isVisible = true;
+                if (scene.xrTargetName) {
+                    scene.xrTargetName.text = `❌ Aucune cible ${handness}!`;
+                    scene.xrTargetName.color = "red";
+                }
+                
+                setTimeout(() => {
+                    if (scene.xrTargetPanel) {
+                        scene.xrTargetPanel.isVisible = false;
+                    }
+                }, 2000);
+            }
+        }
+        
+    } catch (error) {
+        console.error(`Erreur trigger ${handness}:`, error);
     }
 }
 
