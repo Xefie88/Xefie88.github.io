@@ -391,6 +391,39 @@ let currentTargetedSprite = null;
 let triggerHeldControllers = new Map(); // Stocke l'état des triggers maintenus par contrôleur
 let sliderInteractionActive = false;
 
+// Fonction ultra-simple pour scale les particules
+function applyScaleToParticles(scaleValue) {
+    try {
+        if (labelSprites && labelSprites.length > 0) {
+            // Facteur d'espacement inverse : scale élevé = particules serrées
+            const factor = 1.0 / scaleValue;
+            
+            console.log(`Applying scale ${scaleValue.toFixed(2)} with factor ${factor.toFixed(3)} to ${labelSprites.length} sprites`);
+            
+            // Appliquer directement aux sprites
+            for (let i = 0; i < labelSprites.length; i++) {
+                const sprite = labelSprites[i];
+                const originalPos = originalPositions[i];
+                
+                if (sprite && originalPos) {
+                    sprite.position.x = originalPos.x * factor;
+                    sprite.position.y = originalPos.y * factor;
+                    sprite.position.z = originalPos.z * factor;
+                }
+            }
+            
+            console.log(`✅ Scale applied successfully`);
+        } else {
+            console.log(`❌ No labelSprites available (${labelSprites ? labelSprites.length : 'undefined'})`);
+        }
+    } catch (error) {
+        console.error(`❌ Error applying scale:`, error);
+    }
+}
+
+// Rendre la fonction accessible globalement
+window.applyScaleToParticles = applyScaleToParticles;
+
 scene.onBeforeRenderObservable.add(() => {
     // Détecter la particule visée en continu (fonction définie plus bas)
     if (typeof detectTargetedSprite === 'function') {
@@ -562,13 +595,24 @@ scene.onBeforeRenderObservable.add(() => {
                         let sliderValue = (localHitPoint.x - sliderStart) / sliderWidth * 2 - 1;
                         sliderValue = Math.max(-1, Math.min(1, sliderValue)); // Limiter entre -1 et 1
                         
+                        // Appliquer directement le scale aux particules dans la boucle de rendu
+                        // Calculer le scale
+                        let calculatedScale;
+                        if (sliderValue < 0) {
+                            calculatedScale = 1 / (1 + Math.abs(sliderValue) * 9); // 9 = scaleRange - 1
+                        } else if (sliderValue > 0) {
+                            calculatedScale = 1 + sliderValue * 9;
+                        } else {
+                            calculatedScale = 1;
+                        }
+                        
                         // Mettre à jour le scale en continu
                         scene.vrScalePanel3D.updateScale(sliderValue);
                         scene.vrScalePanel3D.currentSliderValue = sliderValue;
                         
-                        // Log moins fréquent pour éviter le spam
+                        // Log pour debug
                         if (debugLogCount % 30 === 0) { // Log tous les 30 frames
-                            console.log(`VR Scale Drag: ${handness} - Value: ${sliderValue.toFixed(3)}, Scale: ${scene.currentScaleValue.toFixed(2)}x`);
+                            console.log(`VR Scale Drag: ${handness} - Slider: ${sliderValue.toFixed(3)}, Scale: ${calculatedScale.toFixed(2)}x`);
                         }
                     }
                 }
@@ -2093,33 +2137,44 @@ function createVRScalePanel3D(scene) {
         
         scene.currentScaleValue = currentScale;
         
-        // Appliquer le scale aux positions des particules
-        applyScaleToParticles(currentScale);
+        // Appliquer directement le scale aux particules avec courbe agressive
+        try {
+            if (scene.spriteManagers && scene.spriteManagers[0] && scene.spriteManagers[0].sprites) {
+                const sprites = scene.spriteManagers[0].sprites;
+                
+                // Courbe agressive pour plus d'effet visuel des deux côtés
+                let factor;
+                if (currentScale < 1.0) {
+                    // Pour scale < 1: étalement agressif avec courbe exponentielle
+                    // Utiliser une courbe qui va de 1.0 à 10.0 de façon exponentielle
+                    factor = Math.pow(10, (1 - currentScale) / 0.9); // De 1.0 à 10.0 de façon exponentielle
+                } else {
+                    // Pour scale >= 1: compactage TRÈS agressif
+                    // Utiliser une courbe qui va jusqu'à 0.01 pour X10 (très très rapproché)
+                    factor = Math.pow(0.01, (currentScale - 1) / 9); // De 1.0 à 0.01 de façon exponentielle
+                }
+                
+                console.log(`Applying scale ${currentScale.toFixed(2)} with AGGRESSIVE factor ${factor.toFixed(4)} to ${sprites.length} sprites`);
+                
+                sprites.forEach(sprite => {
+                    if (sprite.originalPosition) {
+                        sprite.position.x = sprite.originalPosition.x * factor;
+                        sprite.position.y = sprite.originalPosition.y * factor;
+                        sprite.position.z = sprite.originalPosition.z * factor;
+                    }
+                });
+                
+                console.log(`✅ Scale applied successfully - ${currentScale > 1 ? 'HEAVILY COMPACTED' : 'EXPANDED'}`);
+            } else {
+                console.log(`❌ No sprite managers or sprites available`);
+            }
+        } catch (error) {
+            console.error(`❌ Error applying scale:`, error);
+        }
         
         updateScaleTexture();
     }
     
-    // Fonction pour appliquer le scale aux positions des particules
-    function applyScaleToParticles(scaleValue) {
-        if (labelSprites && labelSprites.length > 0 && originalPositions && originalPositions.length > 0) {
-            // Inverser la logique : scale faible = particules éloignées, scale élevé = particules compactes
-            const spacingFactor = 1 / scaleValue;
-            
-            labelSprites.forEach((sprite, idx) => {
-                if (originalPositions[idx]) {
-                    // Appliquer le facteur d'espacement aux positions originales
-                    sprite.position.x = originalPositions[idx].x * spacingFactor;
-                    sprite.position.y = originalPositions[idx].y * spacingFactor;
-                    sprite.position.z = originalPositions[idx].z * spacingFactor;
-                    
-                    // Mettre à jour aussi la position originale pour les calculs futurs
-                    sprite.originalPosition = sprite.position.clone();
-                }
-            });
-            
-            console.log(`VR Scale Applied: Scale ${scaleValue.toFixed(2)}x, Spacing Factor: ${spacingFactor.toFixed(2)}x`);
-        }
-    }
     
     // Stocker les références
     scalePanelSystem.plane = scaleInfoPlane;
