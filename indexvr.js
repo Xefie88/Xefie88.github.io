@@ -2092,7 +2092,33 @@ function createVRScalePanel3D(scene) {
         }
         
         scene.currentScaleValue = currentScale;
+        
+        // Appliquer le scale aux positions des particules
+        applyScaleToParticles(currentScale);
+        
         updateScaleTexture();
+    }
+    
+    // Fonction pour appliquer le scale aux positions des particules
+    function applyScaleToParticles(scaleValue) {
+        if (labelSprites && labelSprites.length > 0 && originalPositions && originalPositions.length > 0) {
+            // Inverser la logique : scale faible = particules éloignées, scale élevé = particules compactes
+            const spacingFactor = 1 / scaleValue;
+            
+            labelSprites.forEach((sprite, idx) => {
+                if (originalPositions[idx]) {
+                    // Appliquer le facteur d'espacement aux positions originales
+                    sprite.position.x = originalPositions[idx].x * spacingFactor;
+                    sprite.position.y = originalPositions[idx].y * spacingFactor;
+                    sprite.position.z = originalPositions[idx].z * spacingFactor;
+                    
+                    // Mettre à jour aussi la position originale pour les calculs futurs
+                    sprite.originalPosition = sprite.position.clone();
+                }
+            });
+            
+            console.log(`VR Scale Applied: Scale ${scaleValue.toFixed(2)}x, Spacing Factor: ${spacingFactor.toFixed(2)}x`);
+        }
     }
     
     // Stocker les références
