@@ -463,9 +463,19 @@ scene.onBeforeRenderObservable.add(() => {
                 for (const name of componentNames) {
                     const component = leftController.motionController.getComponent(name);
                     if (component && component.axes && component.axes.length >= 2) {
+                        const xAxis = component.axes[0]; // X axis (left/right rotation)
                         const yAxis = component.axes[1]; // Y axis (up/down)
                         
-                        if (Math.abs(yAxis) > 0.1) { // Deadzone
+                        // Rotation horizontale (gauche/droite) avec sensibilité élevée et zone morte réduite
+                        if (Math.abs(xAxis) > 0.05) { // Zone morte réduite de 0.1 à 0.05
+                            const rotationSpeed = 0.12; // Sensibilité encore plus élevée pour la rotation
+                            scene.activeCamera.rotation.y += xAxis * rotationSpeed;
+                            
+                            console.log(`VR HORIZONTAL ROTATION - Component: ${name}, X-axis: ${xAxis.toFixed(2)}, Camera rotation Y: ${scene.activeCamera.rotation.y.toFixed(2)}`);
+                        }
+                        
+                        // Mouvement vertical (haut/bas) avec zone morte réduite
+                        if (Math.abs(yAxis) > 0.05) { // Zone morte réduite de 0.1 à 0.05
                             const movementSpeed = 0.15;
                             const yDelta = -yAxis * movementSpeed; // Inverted for intuitive control
                             scene.activeCamera.position.y += yDelta;
@@ -487,9 +497,19 @@ scene.onBeforeRenderObservable.add(() => {
             if (leftController.inputSource.gamepad) {
                 const gamepad = leftController.inputSource.gamepad;
                 if (gamepad.axes && gamepad.axes.length >= 4) {
-                    const leftStickY = gamepad.axes[3]; // Standard left stick Y
+                    const leftStickX = gamepad.axes[2]; // Standard left stick X (rotation)
+                    const leftStickY = gamepad.axes[3]; // Standard left stick Y (mouvement vertical)
                     
-                    if (Math.abs(leftStickY) > 0.1) {
+                    // Rotation horizontale (gauche/droite) avec sensibilité élevée et zone morte réduite
+                    if (Math.abs(leftStickX) > 0.05) {
+                        const rotationSpeed = 0.12; // Sensibilité encore plus élevée pour la rotation
+                        scene.activeCamera.rotation.y += leftStickX * rotationSpeed;
+                        
+                        console.log(`VR HORIZONTAL ROTATION - Gamepad X: ${leftStickX.toFixed(2)}, Camera rotation Y: ${scene.activeCamera.rotation.y.toFixed(2)}`);
+                    }
+                    
+                    // Mouvement vertical (haut/bas) avec zone morte réduite
+                    if (Math.abs(leftStickY) > 0.05) {
                         const movementSpeed = 0.15;
                         const yDelta = -leftStickY * movementSpeed;
                         scene.activeCamera.position.y += yDelta;
