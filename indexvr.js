@@ -584,14 +584,14 @@ scene.onBeforeRenderObservable.add(() => {
                     const hit = ray.intersectsMesh(scene.vrScalePanel3D.plane);
                     
                     if (hit.hit) {
-                        // Calculer la position relative sur le slider - COHÉRENT AVEC LA NOUVELLE VERSION
+                        // Calculer la position relative sur le slider - COHÉRENT AVEC LA CORRECTION
                         const worldHitPoint = hit.pickedPoint;
                         const panelPosition = scene.vrScalePanel3D.plane.absolutePosition || scene.vrScalePanel3D.plane.position;
                         const localHitPoint = worldHitPoint.subtract(panelPosition);
                         
-                        // Même logique que pour le clic initial - mapping direct
-                        const panelHalfWidth = 0.6; // 1.2 / 2
-                        let sliderValue = localHitPoint.x / panelHalfWidth; // Direct mapping
+                        // Même logique corrigée que pour le clic initial
+                        const panelWidth = 1.2;
+                        let sliderValue = localHitPoint.x / (panelWidth * 0.35); // Facteur de correction empirique
                         sliderValue = Math.max(-1, Math.min(1, sliderValue)); // Forcer les limites
                         
                         // Mettre à jour directement
@@ -1820,10 +1820,16 @@ function handleVRTriggerInteractionNew(controller, handness, isPressed = true) {
                 // Debug détaillé
                 console.log(`🔍 Hit Details: World=${worldHitPoint.toString()}, Panel=${panelPosition.toString()}, Local=${localHitPoint.toString()}`);
                 
-                // Le panneau fait 1.2 unités de largeur - mapping simple et direct
-                const panelHalfWidth = 0.6; // 1.2 / 2
-                let sliderValue = localHitPoint.x / panelHalfWidth; // Direct mapping: -0.6 = -1, +0.6 = +1
+                // CALIBRATION CORRIGÉE - Le panneau VR a des coordonnées différentes
+                // Après observation : le décalage 0.10x → 0.35x indique un facteur ~1.67
+                const panelWidth = 1.2; // Largeur totale du panneau
+                
+                // Mapping corrigé basé sur l'observation du décalage
+                // Si 0.10x (position -1) donne 0.35x, il faut ajuster le mapping
+                let sliderValue = localHitPoint.x / (panelWidth * 0.35); // Facteur de correction empirique
                 sliderValue = Math.max(-1, Math.min(1, sliderValue)); // Forcer les limites
+                
+                console.log(`🔧 CALIBRATION: panelWidth=${panelWidth}, factor=${panelWidth * 0.35}, mapping=${sliderValue.toFixed(3)}`);
                 
                 // Application IMMÉDIATE du scale avec DEBUG COMPLET
                 console.log(`🔍 VR COMPLETE DEBUG:`);
