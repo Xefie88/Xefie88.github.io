@@ -152,14 +152,29 @@
         </style>
     </head>
 <body>
-    <script type="module" src="./indexvr.js"></script>
-	<div id="fileInputContainer">
-	       <select id="fileSelect">
-	           <option value="">Choisir un fichier...</option>
-	           <option value="test_particles.json">Test Particles</option>
-	           <option value="encrypted_PSO_0.json">Encrypted PSO Data</option>
-	       </select>
-	       <button id="loadFileButton">Charger</button>
+    <script type="module" src="./indexvr.js?v=2025061302"></script>
+	<div id="fileInputContainer" style="background-color: rgba(255, 255, 255, 0.9);">
+	       <div id="statusMessage" style="margin-bottom: 15px; padding: 10px; background-color: #e3f2fd; border-radius: 5px; font-weight: bold;">
+	           🔄 Application prête - Aucun fichier chargé. Veuillez sélectionner un fichier.
+	       </div>
+	       <div style="margin-bottom: 10px;">
+	           <label for="fileInput" style="display: block; font-weight: bold; margin-bottom: 5px;">
+	               📁 Choisir un fichier depuis votre PC:
+	           </label>
+	           <input type="file" id="fileInput" style="margin-right: 10px; width: 250px;">
+	           <button id="loadFileButton" style="background-color: #28a745; padding: 8px 15px;">Charger fichier</button>
+	       </div>
+	       <div style="margin-top: 15px; padding-top: 10px; border-top: 1px solid #ccc;">
+	           <label style="font-size: 12px; color: #666; display: block; margin-bottom: 5px;">
+	               Ou utiliser un fichier prédéfini:
+	           </label>
+	           <select id="fileSelect" style="margin-right: 10px; min-width: 150px;">
+	               <option value="">-- Choisir --</option>
+	               <option value="test_particles.json">Test Particles</option>
+	               <option value="encrypted_PSO_0.json">Encrypted PSO Data</option>
+	           </select>
+	           <button id="loadPresetButton" style="background-color: #007bff; padding: 8px 15px;">Charger prédéfini</button>
+	       </div>
 	   </div>
 	<div id="searchContainer">
         <input type="text" id="searchInput" list="particlesList" placeholder="Enter particle name">

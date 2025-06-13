@@ -1092,46 +1092,147 @@ document.addEventListener("DOMContentLoaded", function() {
 
 });
 
-loadFileButton.addEventListener('click', async () => {
-    const fileSelect = document.getElementById('fileSelect');
-    const selectedFile = fileSelect.value;
+// Fonction pour mettre à jour le message de statut
+function updateStatusMessage(message, type = 'info') {
+    const statusElement = document.getElementById('statusMessage');
+    if (statusElement) {
+        const colors = {
+            'info': '#e3f2fd',
+            'success': '#e8f5e8',
+            'error': '#ffebee',
+            'warning': '#fff3e0'
+        };
+        statusElement.style.backgroundColor = colors[type] || colors.info;
+        statusElement.innerHTML = message;
+        console.log('Status:', message);
+    }
+}
 
-    if (selectedFile) {
+// Gestionnaire pour charger un fichier depuis le PC
+loadFileButton.addEventListener('click', async () => {
+    const fileInput = document.getElementById('fileInput');
+    
+    updateStatusMessage('🔄 Vérification du fichier sélectionné...', 'info');
+    
+    if (fileInput.files && fileInput.files.length > 0) {
+        const file = fileInput.files[0];
+        console.log('🔍 USER SELECTED FILE:', file.name, 'Size:', file.size, 'Type:', file.type);
+        updateStatusMessage(`📂 Chargement de "${file.name}" (${Math.round(file.size/1024)}KB)...`, 'info');
+        
         try {
-            if (selectedFile === 'encrypted_PSO_0.json') {
-                // Handle encrypted file
+            const fileContent = await file.text();
+            console.log('✅ File content loaded, length:', fileContent.length);
+            
+            // Check if it's an encrypted file
+            if (file.name.toLowerCase().includes('encrypted') ||
+                file.name.toLowerCase().includes('crypto') ||
+                fileContent.startsWith('U2FsdGVk') ||
+                fileContent.includes('Salted__')) {
+                
+                console.log('🔐 Detected encrypted file, asking for password');
+                updateStatusMessage('🔐 Fichier crypté détecté - Saisie du mot de passe...', 'warning');
                 const password = await showPasswordModal();
-                const response = await fetch('./' + selectedFile);
-                const encryptedData = await response.text();
-                const decryptedData = decryptData(encryptedData, password);
+                const decryptedData = decryptData(fileContent, password);
                 
                 if (decryptedData) {
+                    console.log('✅ File decrypted successfully, particles:', decryptedData.length);
+                    updateStatusMessage(`✅ Fichier "${file.name}" chargé avec succès (${decryptedData.length} particules)`, 'success');
                     main(decryptedData, 20);
                     document.getElementById('fileInputContainer').style.display = 'none';
+                } else {
+                    updateStatusMessage('❌ Échec du décryptage - Mot de passe incorrect', 'error');
+                    alert('❌ Impossible de décrypter le fichier. Vérifiez le mot de passe.');
                 }
             } else {
-                // Handle regular JSON file
-                const response = await fetch('./' + selectedFile);
-                const data = await response.json();
-                main(data, 20);
-                document.getElementById('fileInputContainer').style.display = 'none';
+                // Try to parse as JSON
+                try {
+                    const data = JSON.parse(fileContent);
+                    console.log('✅ JSON parsed successfully, particles:', data.length);
+                    updateStatusMessage(`✅ Fichier "${file.name}" chargé avec succès (${data.length} particules)`, 'success');
+                    main(data, 20);
+                    document.getElementById('fileInputContainer').style.display = 'none';
+                } catch (parseError) {
+                    console.error('❌ JSON parse error:', parseError);
+                    updateStatusMessage('❌ Erreur: Fichier JSON invalide', 'error');
+                    alert('❌ Le fichier sélectionné n\'est pas un fichier JSON valide.\n\nErreur: ' + parseError.message);
+                }
             }
         } catch (error) {
-            alert('Erreur lors du chargement du fichier: ' + error.message);
-            console.error(error);
+            console.error('❌ File reading error:', error);
+            updateStatusMessage('❌ Erreur lors de la lecture du fichier', 'error');
+            alert('❌ Erreur lors de la lecture du fichier: ' + error.message);
         }
     } else {
-        try {
-            // Use test data as default
-            const response = await fetch('./test_particles.json');
-            const data = await response.json();
-            main(data, 20);
-            document.getElementById('fileInputContainer').style.display = 'none';
-        } catch (error) {
-            console.error("Failed to load default JSON:", error);
-        }
+        updateStatusMessage('⚠️ Aucun fichier sélectionné', 'warning');
+        alert('⚠️ Veuillez sélectionner un fichier avant de cliquer sur "Charger fichier"');
     }
 });
+
+// Gestionnaire pour charger un fichier prédéfini
+const loadPresetButton = document.getElementById('loadPresetButton');
+if (loadPresetButton) {
+    loadPresetButton.addEventListener('click', async () => {
+        const fileSelect = document.getElementById('fileSelect');
+        const selectedFile = fileSelect.value;
+        
+        if (selectedFile) {
+            console.log('Loading predefined file:', selectedFile);
+            
+            try {
+                if (selectedFile === 'encrypted_PSO_0.json') {
+                    const password = await showPasswordModal();
+                    const response = await fetch('./' + selectedFile);
+                    const encryptedData = await response.text();
+                    const decryptedData = decryptData(encryptedData, password);
+                    
+                    if (decryptedData) {
+                        main(decryptedData, 20);
+                        document.getElementById('fileInputContainer').style.display = 'none';
+                    } else {
+                        alert('❌ Mot de passe incorrect ou fichier corrompu.');
+                    }
+                } else {
+                    const response = await fetch('./' + selectedFile);
+                    const data = await response.json();
+                    main(data, 20);
+                    document.getElementById('fileInputContainer').style.display = 'none';
+                }
+            } catch (error) {
+                alert('❌ Erreur lors du chargement du fichier prédéfini: ' + error.message);
+                console.error(error);
+            }
+        } else {
+            alert('⚠️ Veuillez sélectionner un fichier prédéfini dans la liste déroulante');
+        }
+    });
+}
+
+// Debug: Traquer tous les appels à la fonction main()
+const originalMain = main;
+window.main = function(data, ratio) {
+    console.log('🚨 MAIN() CALLED with', data?.length || 'unknown', 'particles, ratio:', ratio);
+    console.trace('Call stack trace:');
+    updateStatusMessage(`🔄 Chargement en cours (${data?.length || 'unknown'} particules)...`, 'info');
+    return originalMain(data, ratio);
+};
+
+// Debug: Vérifier si d'autres scripts sont chargés
+console.log('🔍 Scripts loaded:', document.scripts.length);
+for(let i = 0; i < document.scripts.length; i++) {
+    console.log(`  Script ${i}:`, document.scripts[i].src || 'inline');
+}
+
+// Debug: Vérifier les event listeners sur loadFileButton
+console.log('🔍 Checking loadFileButton listeners...');
+const button = document.getElementById('loadFileButton');
+if (button) {
+    console.log('✅ loadFileButton found');
+} else {
+    console.log('❌ loadFileButton NOT found');
+}
+
+console.log('✅ IndexVR.js loaded - NO automatic file loading. Waiting for user selection.');
+updateStatusMessage('🔄 Application prête - Aucun fichier chargé automatiquement. Sélectionnez votre fichier.', 'info');
 
 const generatedColors = {};
 function getColor(type) {
