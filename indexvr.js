@@ -159,7 +159,7 @@ scene.createDefaultXRExperienceAsync({
         }
         scene.xrLegendTexture.addControl(xrLegendPanel);
 
-        // Toggle legend with right B button
+        // Toggle legend with right B button - USE NEW GUI 3D LEGEND
         xrHelper.input.onControllerAddedObservable.add(ctrl => {
             ctrl.onMotionControllerInitObservable.add(motionController => {
                 if (motionController.handness === 'right') {
@@ -167,7 +167,13 @@ scene.createDefaultXRExperienceAsync({
                     if (bButton) {
                         bButton.onButtonStateChangedObservable.add(() => {
                             if (bButton.pressed) {
-                                xrLegendPanel.isVisible = !xrLegendPanel.isVisible;
+                                // Toggle new GUI 3D legend panel
+                                if (scene.vrLegendPanel3D) {
+                                    scene.vrLegendPanel3D.toggle();
+                                } else {
+                                    // Fallback to old 2D panel if 3D not available
+                                    xrLegendPanel.isVisible = !xrLegendPanel.isVisible;
+                                }
                             }
                         });
                     }
@@ -995,17 +1001,34 @@ engine.runRenderLoop(renderLoop);
 
 
     createLegend(data);
- updateParticleList();
- 
- // Créer l'indicateur VR 3D après le chargement des données
- if (!scene.vrTargetIndicator) {
-   scene.vrTargetIndicator = createVRTargetIndicator(scene);
- }
- 
- // Créer le panneau de scale VR 3D
- if (!scene.vrScalePanel3D) {
-   scene.vrScalePanel3D = createVRScalePanel3D(scene);
- }
+    updateParticleList();
+    
+    // Créer l'indicateur VR 3D après le chargement des données
+    if (!scene.vrTargetIndicator) {
+      scene.vrTargetIndicator = createVRTargetIndicator(scene);
+    }
+    
+    // Créer le panneau de scale VR 3D
+    if (!scene.vrScalePanel3D) {
+      scene.vrScalePanel3D = createVRScalePanel3D(scene);
+    }
+    
+    // Créer le panneau de légende VR 3D avec délai pour s'assurer que tout est prêt
+    setTimeout(() => {
+      try {
+        if (!scene.vrLegendPanel3D) {
+          console.log("🕒 Creating VR Legend Panel 3D after delay...");
+          scene.vrLegendPanel3D = createVRLegendPanel3D(scene, data);
+          if (scene.vrLegendPanel3D) {
+            console.log("✅ VR Legend Panel 3D created successfully with delay");
+          } else {
+            console.error("❌ VR Legend Panel 3D creation failed");
+          }
+        }
+      } catch (error) {
+        console.error("❌ Error creating VR Legend Panel 3D with delay:", error);
+      }
+    }, 500); // Délai de 500ms pour s'assurer que le GUI 3D Manager est prêt
  
 }
 
@@ -1851,8 +1874,71 @@ function handleVRTriggerInteractionNew(controller, handness, isPressed = true) {
             }
         }
         
-        // Note: Le panneau de légende GUI 3D gère automatiquement les interactions via BABYLON.GUI
-        // Pas besoin de gestion manuelle des clics comme pour le scale panel
+        // Vérifier si on interagit avec la légende 3D (plan + texture)
+        if (isPressed && scene.vrLegendPanel3D && scene.vrLegendPanel3D.plane.isVisible) {
+            let rayOrigin, rayDirection;
+            
+            if (controller.pointer) {
+                rayOrigin = controller.pointer.absolutePosition || controller.pointer.position;
+                rayDirection = controller.pointer.getDirection ?
+                    controller.pointer.getDirection(BABYLON.Vector3.Forward()) :
+                    new BABYLON.Vector3(0, 0, 1);
+            } else if (controller.motionController && controller.motionController.rootMesh) {
+                rayOrigin = controller.motionController.rootMesh.absolutePosition || controller.motionController.rootMesh.position;
+                rayDirection = controller.motionController.rootMesh.getDirection ?
+                    controller.motionController.rootMesh.getDirection(BABYLON.Vector3.Forward()) :
+                    new BABYLON.Vector3(0, 0, 1);
+            } else {
+                rayOrigin = new BABYLON.Vector3(0, 0, 0);
+                rayDirection = new BABYLON.Vector3(0, 0, 1);
+            }
+            
+            // Créer un ray pour tester l'intersection avec le plan de la légende
+            const ray = new BABYLON.Ray(rayOrigin, rayDirection);
+            const hit = ray.intersectsMesh(scene.vrLegendPanel3D.plane);
+            
+            if (hit.hit) {
+                console.log(`🎯 VR ${handness}: LEGEND PLANE HIT DETECTED`);
+                
+                // Calculer la position relative sur le plan
+                const worldHitPoint = hit.pickedPoint;
+                const planePosition = scene.vrLegendPanel3D.plane.absolutePosition || scene.vrLegendPanel3D.plane.position;
+                const localHitPoint = worldHitPoint.subtract(planePosition);
+                
+                // Obtenir les dimensions du plan (mêmes que dans createVRLegendPanel3D)
+                const planeWidth = 2.0; // Largeur définie dans createVRLegendPanel3D
+                const planeHeight = Math.max(2.0, scene.vrLegendPanel3D.clickableAreas.length * 0.15 + 0.5); // Même calcul que lors de la création
+                
+                console.log(`🔍 Legend Hit Details: World=${worldHitPoint.toString()}, Plane=${planePosition.toString()}, Local=${localHitPoint.toString()}`);
+                console.log(`📏 Plane dimensions: ${planeWidth} x ${planeHeight}`);
+                
+                // Utiliser la fonction getClickedType pour identifier le type cliqué
+                const clickedType = scene.vrLegendPanel3D.getClickedType(localHitPoint.x, localHitPoint.y, planeWidth, planeHeight);
+                
+                if (clickedType) {
+                    console.log(`🎯 VR ${handness}: LEGEND TYPE HIT - ${clickedType}`);
+                    
+                    // Toggle l'état (même logique que la légende 2D)
+                    window.xrLegendActiveTypes[clickedType] = !window.xrLegendActiveTypes[clickedType];
+                    const active = window.xrLegendActiveTypes[clickedType] !== false;
+                    
+                    // Mettre à jour l'affichage de la légende
+                    if (scene.vrLegendPanel3D.updateDisplay) {
+                        scene.vrLegendPanel3D.updateDisplay();
+                    }
+                    
+                    // Appliquer le filtre aux sprites
+                    filterByType(clickedType);
+                    
+                    console.log(`🎯 VR Legend Trigger: Toggled ${clickedType} → ${active ? 'ON' : 'OFF'}`);
+                    return; // Arrêter ici, interaction traitée
+                } else {
+                    console.log(`❌ VR ${handness}: Hit on legend plane but no type identified`);
+                }
+            } else {
+                console.log(`❌ VR ${handness}: No hit on legend plane`);
+            }
+        }
         
         // Si trigger relâché, on arrête l'interaction ici
         if (!isPressed) {
@@ -2268,6 +2354,199 @@ function createVRScalePanel3D(scene) {
     
     console.log("Camera-attached VR scale panel 3D created");
     return scalePanelSystem;
+}
+
+// Fonction pour créer un panneau de légende 3D avec plan et texture dynamique (comme scale panel)
+function createVRLegendPanel3D(scene, data) {
+    const legendPanelSystem = {};
+    
+    console.log("🏗️ Creating VR Legend Panel 3D (plane + dynamic texture)...");
+    
+    try {
+        // Obtenir les types uniques (TOUS les types comme dans la version 2D)
+        const uniqueTypes = [...new Set(data.map(item => item.subType))].sort();
+        console.log(`📋 Found ${uniqueTypes.length} unique types:`, uniqueTypes);
+        
+        // Créer un plan 3D pour la légende (comme le scale panel)
+        const legendPlane = BABYLON.MeshBuilder.CreatePlane("vrLegendPlane", {
+            width: 2.0,
+            height: Math.max(2.0, uniqueTypes.length * 0.15 + 0.5) // Hauteur dynamique selon le nombre de types
+        }, scene);
+        
+        // Position plus en haut à gauche
+        legendPlane.position = new BABYLON.Vector3(-2.8, 1.9, 3);
+        legendPlane.isVisible = false;
+        
+        // Créer une texture dynamique pour dessiner la légende
+        const textureHeight = Math.max(400, uniqueTypes.length * 40 + 100);
+        let legendTexture = new BABYLON.DynamicTexture("vrLegendTexture", {width: 600, height: textureHeight}, scene);
+        const legendMaterial = new BABYLON.StandardMaterial("vrLegendMat", scene);
+        legendMaterial.diffuseTexture = legendTexture;
+        legendMaterial.emissiveTexture = legendTexture;
+        legendMaterial.disableLighting = true;
+        legendMaterial.hasAlpha = true;
+        legendPlane.material = legendMaterial;
+        
+        // État des types (comme dans la légende 2D) - Réinitialiser pour éviter les conflits
+        window.xrLegendActiveTypes = {};
+        
+        // Initialiser TOUS les types à true (particules visibles par défaut)
+        uniqueTypes.forEach(type => {
+            window.xrLegendActiveTypes[type] = true;
+        });
+        
+        // Stocker les zones cliquables pour la détection de trigger
+        const clickableAreas = [];
+        
+        // Fonction pour dessiner la légende sur la texture (même design que l'original)
+        function updateLegendTexture() {
+            legendTexture.clear();
+            const context = legendTexture.getContext();
+            
+            // Fond semi-transparent comme la légende 2D originale
+            context.fillStyle = "rgba(0, 0, 0, 0.7)";
+            context.fillRect(0, 0, 600, textureHeight);
+            
+            // Bordure blanche
+            context.strokeStyle = "white";
+            context.lineWidth = 2;
+            context.strokeRect(10, 10, 580, textureHeight - 20);
+            
+            // Réinitialiser les zones cliquables
+            clickableAreas.length = 0;
+            
+            // Dessiner chaque élément de légende
+            uniqueTypes.forEach((type, index) => {
+                const y = 50 + index * 40; // Position Y de chaque ligne
+                const isActive = window.xrLegendActiveTypes[type] !== false;
+                const color = getColor(type);
+                
+                // Boîte colorée (comme dans la légende 2D originale)
+                const colorBoxX = 30;
+                const colorBoxY = y - 15;
+                const colorBoxSize = 30;
+                
+                context.fillStyle = `rgba(${Math.round(color.r*255)}, ${Math.round(color.g*255)}, ${Math.round(color.b*255)}, ${isActive ? 1.0 : 0.3})`;
+                context.fillRect(colorBoxX, colorBoxY, colorBoxSize, colorBoxSize);
+                
+                // Bordure de la boîte colorée
+                context.strokeStyle = "white";
+                context.lineWidth = 1;
+                context.strokeRect(colorBoxX, colorBoxY, colorBoxSize, colorBoxSize);
+                
+                // Label de texte (comme dans la légende 2D originale)
+                context.font = "20px Arial";
+                context.fillStyle = isActive ? "white" : "rgba(255, 255, 255, 0.5)";
+                context.textAlign = "left";
+                context.textBaseline = "middle";
+                context.fillText(type, colorBoxX + colorBoxSize + 15, y);
+                
+                // Stocker la zone cliquable (toute la ligne)
+                clickableAreas.push({
+                    type: type,
+                    x1: colorBoxX,
+                    y1: colorBoxY,
+                    x2: 580,
+                    y2: colorBoxY + colorBoxSize,
+                    color: color,
+                    isActive: isActive
+                });
+                
+                console.log(`🎨 Drew legend item: ${type} at Y=${y}, active=${isActive}`);
+            });
+            
+            legendTexture.update();
+            console.log(`✅ Legend texture updated with ${uniqueTypes.length} items, ${clickableAreas.length} clickable areas`);
+        }
+        
+        // Fonction pour attacher le panneau à la caméra (comme scale panel)
+        function attachToCamera() {
+            const camera = scene.activeCamera;
+            if (camera) {
+                legendPlane.parent = camera;
+                console.log("📷 VR Legend Panel 3D attached to camera");
+            }
+        }
+        
+        // Fonction pour tester si un point 2D est dans une zone cliquable
+        function getClickedType(localX, localY, planeWidth, planeHeight) {
+            // Les coordonnées locales du plan vont de -planeWidth/2 à +planeWidth/2 et -planeHeight/2 à +planeHeight/2
+            // Normaliser d'abord entre 0 et 1
+            const normalizedX = (localX + planeWidth/2) / planeWidth;
+            const normalizedY = (localY + planeHeight/2) / planeHeight;
+            
+            // Puis convertir en coordonnées texture (0-600, 0-textureHeight)
+            const textureX = normalizedX * 600;
+            const textureY = (1.0 - normalizedY) * textureHeight; // Inverser Y car les textures ont Y=0 en haut
+            
+            console.log(`🔍 Click test: local(${localX.toFixed(3)}, ${localY.toFixed(3)}) → normalized(${normalizedX.toFixed(3)}, ${normalizedY.toFixed(3)}) → texture(${textureX.toFixed(1)}, ${textureY.toFixed(1)})`);
+            
+            // Tester chaque zone cliquable
+            for (const area of clickableAreas) {
+                if (textureX >= area.x1 && textureX <= area.x2 &&
+                    textureY >= area.y1 && textureY <= area.y2) {
+                    console.log(`🎯 Hit detected on type: ${area.type} (area: ${area.x1}-${area.x2}, ${area.y1}-${area.y2})`);
+                    return area.type;
+                }
+            }
+            
+            console.log(`❌ No hit detected in clickable areas. Tested ${clickableAreas.length} areas`);
+            clickableAreas.forEach((area, i) => {
+                console.log(`  Area ${i}: ${area.type} (${area.x1}-${area.x2}, ${area.y1}-${area.y2})`);
+            });
+            return null;
+        }
+        
+        // Stocker les références
+        legendPanelSystem.plane = legendPlane;
+        legendPanelSystem.texture = legendTexture;
+        legendPanelSystem.material = legendMaterial;
+        legendPanelSystem.clickableAreas = clickableAreas;
+        legendPanelSystem.getClickedType = getClickedType;
+        
+        // Fonctions
+        legendPanelSystem.show = function() {
+            console.log("👁️ VR: Showing legend panel 3D (plane + texture)");
+            legendPlane.isVisible = true;
+            updateLegendTexture();
+            attachToCamera();
+        };
+        
+        legendPanelSystem.hide = function() {
+            console.log("🙈 VR: Hiding legend panel 3D (plane + texture)");
+            legendPlane.isVisible = false;
+        };
+        
+        legendPanelSystem.toggle = function() {
+            if (legendPlane.isVisible) {
+                this.hide();
+            } else {
+                this.show();
+            }
+        };
+        
+        legendPanelSystem.updateDisplay = function() {
+            updateLegendTexture();
+        };
+        
+        legendPanelSystem.dispose = function() {
+            if (legendTexture) legendTexture.dispose();
+            if (legendMaterial) legendMaterial.dispose();
+            if (legendPlane) legendPlane.dispose();
+        };
+        
+        // Initialiser la texture
+        updateLegendTexture();
+        
+        console.log("✅ VR Legend Panel 3D (plane + texture) created successfully");
+        return legendPanelSystem;
+        
+    } catch (error) {
+        console.error("❌ Error creating VR Legend Panel 3D:", error);
+        console.error("Error details:", error.message);
+        console.error("Stack trace:", error.stack);
+        return null;
+    }
 }
 
 //scene.debugLayer.show()
