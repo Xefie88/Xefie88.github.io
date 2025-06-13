@@ -2374,7 +2374,7 @@ function createVRLegendPanel3D(scene, data) {
         }, scene);
         
         // Position plus en haut à gauche
-        legendPlane.position = new BABYLON.Vector3(-2.2, 1.4, 3);
+        legendPlane.position = new BABYLON.Vector3(-1.5, 1, 3);
         legendPlane.isVisible = false;
         
         // Créer une texture dynamique pour dessiner la légende
