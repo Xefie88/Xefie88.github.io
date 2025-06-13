@@ -584,15 +584,15 @@ scene.onBeforeRenderObservable.add(() => {
                     const hit = ray.intersectsMesh(scene.vrScalePanel3D.plane);
                     
                     if (hit.hit) {
-                        // Calculer la position relative sur le slider - COHÉRENT AVEC LA VERSION INITIALE
-                        const localHitPoint = hit.pickedPoint.subtract(scene.vrScalePanel3D.plane.position);
+                        // Calculer la position relative sur le slider - COHÉRENT AVEC LA NOUVELLE VERSION
+                        const worldHitPoint = hit.pickedPoint;
+                        const panelPosition = scene.vrScalePanel3D.plane.absolutePosition || scene.vrScalePanel3D.plane.position;
+                        const localHitPoint = worldHitPoint.subtract(panelPosition);
                         
-                        // Même logique que pour le clic initial
-                        const panelWidth = 1.2;
-                        
-                        // Mapper la position X du panneau vers la valeur du slider
-                        let sliderValue = localHitPoint.x / (panelWidth / 2); // Normaliser entre -1 et +1
-                        sliderValue = Math.max(-1, Math.min(1, sliderValue)); // Limiter strictement
+                        // Même logique que pour le clic initial - mapping direct
+                        const panelHalfWidth = 0.6; // 1.2 / 2
+                        let sliderValue = localHitPoint.x / panelHalfWidth; // Direct mapping
+                        sliderValue = Math.max(-1, Math.min(1, sliderValue)); // Forcer les limites
                         
                         // Mettre à jour directement
                         scene.vrScalePanel3D.updateScale(sliderValue);
@@ -600,7 +600,7 @@ scene.onBeforeRenderObservable.add(() => {
                         
                         // Log pour debug
                         if (debugLogCount % 60 === 0) {
-                            console.log(`🔄 VR Scale Drag: ${handness} - Hit X: ${localHitPoint.x.toFixed(3)}, Slider: ${sliderValue.toFixed(3)}, Scale: ${scene.currentScaleValue.toFixed(2)}x`);
+                            console.log(`🔄 VR Scale Drag: ${handness} - Local X: ${localHitPoint.x.toFixed(3)}, Slider: ${sliderValue.toFixed(3)}, Scale: ${scene.currentScaleValue.toFixed(2)}x`);
                         }
                     }
                 }
@@ -1783,50 +1783,65 @@ function handleVRTriggerInteractionNew(controller, handness, isPressed = true) {
             sliderInteractionActive = false; // Arrêter l'interaction avec le slider
         }
         
-        // Vérifier d'abord si on interagit avec le panneau de scale
-        if (isPressed && scene.vrScalePanel3D && scene.vrScalePanel3D.plane.isVisible && controller.pointer) {
-            const rayOrigin = controller.pointer.absolutePosition || controller.pointer.position;
-            const rayDirection = controller.pointer.getDirection ?
-                controller.pointer.getDirection(BABYLON.Vector3.Forward()) :
-                new BABYLON.Vector3(0, 0, 1);
+        // Vérifier d'abord si on interagit avec le panneau de scale - VERSION SIMPLIFIÉE ET FIABLE
+        if (isPressed && scene.vrScalePanel3D && scene.vrScalePanel3D.plane.isVisible) {
+            // Essayer différentes méthodes pour obtenir la position du ray
+            let rayOrigin, rayDirection;
+            
+            if (controller.pointer) {
+                rayOrigin = controller.pointer.absolutePosition || controller.pointer.position;
+                rayDirection = controller.pointer.getDirection ?
+                    controller.pointer.getDirection(BABYLON.Vector3.Forward()) :
+                    new BABYLON.Vector3(0, 0, 1);
+            } else if (controller.motionController && controller.motionController.rootMesh) {
+                rayOrigin = controller.motionController.rootMesh.absolutePosition || controller.motionController.rootMesh.position;
+                rayDirection = controller.motionController.rootMesh.getDirection ?
+                    controller.motionController.rootMesh.getDirection(BABYLON.Vector3.Forward()) :
+                    new BABYLON.Vector3(0, 0, 1);
+            } else {
+                // Fallback: utiliser les coordonnées de base
+                rayOrigin = new BABYLON.Vector3(0, 0, 0);
+                rayDirection = new BABYLON.Vector3(0, 0, 1);
+            }
             
             // Créer un ray pour tester l'intersection avec le panneau de scale
             const ray = new BABYLON.Ray(rayOrigin, rayDirection);
             const hit = ray.intersectsMesh(scene.vrScalePanel3D.plane);
             
             if (hit.hit) {
-                console.log(`VR ${handness}: Début interaction avec le panneau de scale`);
+                console.log(`🎯 VR ${handness}: SCALE PANEL HIT DETECTED`);
                 sliderInteractionActive = true;
                 
-                // Calculer la position relative sur le slider - VERSION CORRIGÉE POUR VR
-                const localHitPoint = hit.pickedPoint.subtract(scene.vrScalePanel3D.plane.position);
+                // Calculer la position relative sur le slider - MÉTHODE SIMPLIFIÉE
+                const worldHitPoint = hit.pickedPoint;
+                const panelPosition = scene.vrScalePanel3D.plane.absolutePosition || scene.vrScalePanel3D.plane.position;
+                const localHitPoint = worldHitPoint.subtract(panelPosition);
                 
-                // Debug: Afficher les coordonnées du hit point
-                console.log(`🎯 VR Hit Debug: World=${hit.pickedPoint.toString()}, Panel=${scene.vrScalePanel3D.plane.position.toString()}, Local=${localHitPoint.toString()}`);
+                // Debug détaillé
+                console.log(`🔍 Hit Details: World=${worldHitPoint.toString()}, Panel=${panelPosition.toString()}, Local=${localHitPoint.toString()}`);
                 
-                // Le panneau fait 1.2 unités de largeur totale
-                const panelWidth = 1.2;
-                const panelStart = -panelWidth / 2; // -0.6
-                const panelEnd = panelWidth / 2;    // +0.6
+                // Le panneau fait 1.2 unités de largeur - mapping simple et direct
+                const panelHalfWidth = 0.6; // 1.2 / 2
+                let sliderValue = localHitPoint.x / panelHalfWidth; // Direct mapping: -0.6 = -1, +0.6 = +1
+                sliderValue = Math.max(-1, Math.min(1, sliderValue)); // Forcer les limites
                 
-                // Le slider occupe 75% du panneau, donc 0.9 unités, centré
-                const sliderWidth = 0.9;
-                const sliderStart = -sliderWidth / 2; // -0.45
-                const sliderEnd = sliderWidth / 2;    // +0.45
+                // Application IMMÉDIATE du scale avec DEBUG COMPLET
+                console.log(`🔍 VR COMPLETE DEBUG:`);
+                console.log(`  → Local Hit X: ${localHitPoint.x.toFixed(3)}`);
+                console.log(`  → Panel Half Width: ${panelHalfWidth}`);
+                console.log(`  → Calculated Slider Value: ${sliderValue.toFixed(3)}`);
+                console.log(`  → Expected Scale: ${sliderValue < 0 ? (0.1 + (sliderValue + 1) * 0.9).toFixed(2) : sliderValue > 0 ? (1.0 + sliderValue * 9.0).toFixed(2) : '1.00'}x`);
                 
-                // Mapper la position X du panneau vers la valeur du slider
-                // De -0.6 (gauche du panneau) à +0.6 (droite du panneau) = -1 à +1 sur le slider
-                let sliderValue = localHitPoint.x / (panelWidth / 2); // Normaliser entre -1 et +1
-                sliderValue = Math.max(-1, Math.min(1, sliderValue)); // Limiter strictement
-                
-                // Mettre à jour le scale
                 scene.vrScalePanel3D.updateScale(sliderValue);
                 scene.vrScalePanel3D.currentSliderValue = sliderValue;
                 
-                console.log(`🎯 VR Scale CORRECTED: Hit X: ${localHitPoint.x.toFixed(3)}, Slider: ${sliderValue.toFixed(3)}, Scale: ${scene.currentScaleValue.toFixed(2)}x`);
+                console.log(`  → Final Stored Slider Value: ${scene.vrScalePanel3D.currentSliderValue.toFixed(3)}`);
+                console.log(`  → Final Scale: ${scene.currentScaleValue.toFixed(2)}x`);
                 
-                // Indiquer que nous avons géré l'interaction avec le scale, pas besoin de chercher des particules
+                // Indiquer que nous avons géré l'interaction avec le scale
                 return;
+            } else {
+                console.log(`❌ VR ${handness}: No hit on scale panel`);
             }
         }
         
@@ -2087,22 +2102,43 @@ function createVRScalePanel3D(scene) {
         context.lineWidth = 2;
         context.strokeRect(sliderX, sliderY, sliderWidth, sliderHeight);
         
-        // Position du curseur (-1 à 1 mappé sur la largeur)
+        // Position du curseur - DIRECTEMENT basée sur currentSliderValue (-1 à +1)
+        // C'est la valeur RAW du slider, pas le scale calculé !
         const cursorPos = sliderX + (currentSliderValue + 1) * sliderWidth / 2;
+        
+        // Debug DÉTAILLÉ pour comprendre le décalage
+        console.log(`🎯 CURSOR DEBUG DÉTAILLÉ:`);
+        console.log(`  → currentSliderValue: ${currentSliderValue.toFixed(3)}`);
+        console.log(`  → sliderX (début): ${sliderX}`);
+        console.log(`  → sliderWidth: ${sliderWidth}`);
+        console.log(`  → (currentSliderValue + 1): ${(currentSliderValue + 1).toFixed(3)}`);
+        console.log(`  → (currentSliderValue + 1) * sliderWidth / 2: ${((currentSliderValue + 1) * sliderWidth / 2).toFixed(1)}`);
+        console.log(`  → cursorPos final: ${cursorPos.toFixed(1)}`);
+        console.log(`  → Expected: -1=${sliderX}, 0=${sliderX + sliderWidth/2}, +1=${sliderX + sliderWidth}`);
         
         // Curseur
         context.fillStyle = "#00ff00";
         context.fillRect(cursorPos - 10, sliderY - 10, 20, sliderHeight + 20);
         
-        // Indicateurs de valeurs
+        // Indicateurs de valeurs - POSITIONNÉS EXACTEMENT selon la logique VR
         context.font = "20px Arial";
         context.fillStyle = "white";
-        context.textAlign = "left";
-        context.fillText("0.1x", sliderX - 30, sliderY + 50);
+        
+        // 0.1x est à la position relative -1 (tout à gauche)
+        const pos01x = sliderX + (-1 + 1) * sliderWidth / 2; // = sliderX + 0 = début du slider
         context.textAlign = "center";
-        context.fillText("1.0x", sliderX + sliderWidth/2, sliderY + 50);
-        context.textAlign = "right";
-        context.fillText("10x", sliderX + sliderWidth + 30, sliderY + 50);
+        context.fillText("0.1x", pos01x, sliderY + 50);
+        
+        // 1.0x est à la position relative 0 (centre)
+        const pos10x = sliderX + (0 + 1) * sliderWidth / 2; // = sliderX + sliderWidth/2 = centre
+        context.fillText("1.0x", pos10x, sliderY + 50);
+        
+        // 10x est à la position relative +1 (tout à droite)
+        const pos10xMax = sliderX + (1 + 1) * sliderWidth / 2; // = sliderX + sliderWidth = fin du slider
+        context.fillText("10x", pos10xMax, sliderY + 50);
+        
+        // Debug: Afficher les positions des indicateurs
+        console.log(`📍 Indicators: 0.1x@${pos01x.toFixed(1)}, 1.0x@${pos10x.toFixed(1)}, 10x@${pos10xMax.toFixed(1)}`);
         
         // Instructions
         context.font = "24px Arial";
