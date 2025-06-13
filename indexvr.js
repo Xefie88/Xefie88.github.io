@@ -1851,6 +1851,9 @@ function handleVRTriggerInteractionNew(controller, handness, isPressed = true) {
             }
         }
         
+        // Note: Le panneau de légende GUI 3D gère automatiquement les interactions via BABYLON.GUI
+        // Pas besoin de gestion manuelle des clics comme pour le scale panel
+        
         // Si trigger relâché, on arrête l'interaction ici
         if (!isPressed) {
             return;
