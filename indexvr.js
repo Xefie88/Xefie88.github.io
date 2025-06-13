@@ -535,15 +535,15 @@ scene.onBeforeRenderObservable.add(() => {
                     if (component && component.axes && component.axes.length >= 2) {
                         const xAxis = component.axes[0]; // X axis pour contrôle du scale
                         
-                        if (Math.abs(xAxis) > 0.05) { // Zone morte réduite
-                            const scaleSpeed = 0.02; // Vitesse d'ajustement du scale
+                        if (Math.abs(xAxis) > 0.05) { // Zone morte simple
+                            const scaleSpeed = 0.02; // Vitesse normale
                             const currentValue = scene.vrScalePanel3D.currentSliderValue || 0;
                             const newValue = Math.max(-1, Math.min(1, currentValue + xAxis * scaleSpeed));
                             
                             scene.vrScalePanel3D.updateScale(newValue);
                             scene.vrScalePanel3D.currentSliderValue = newValue;
                             
-                            console.log(`VR SCALE CONTROL - X-axis: ${xAxis.toFixed(2)}, Scale: ${scene.currentScaleValue.toFixed(2)}`);
+                            console.log(`VR SCALE JOYSTICK - X-axis: ${xAxis.toFixed(2)}, Scale: ${scene.currentScaleValue.toFixed(2)}x`);
                         }
                         break;
                     }
@@ -564,13 +564,13 @@ scene.onBeforeRenderObservable.add(() => {
                         scene.vrScalePanel3D.updateScale(newValue);
                         scene.vrScalePanel3D.currentSliderValue = newValue;
                         
-                        console.log(`VR SCALE CONTROL - Gamepad X: ${rightStickX.toFixed(2)}, Scale: ${scene.currentScaleValue.toFixed(2)}`);
+                        console.log(`VR SCALE GAMEPAD - X: ${rightStickX.toFixed(2)}, Scale: ${scene.currentScaleValue.toFixed(2)}x`);
                     }
                 }
             }
         }
         
-        // Gérer l'interaction continue avec le slider quand le trigger est maintenu
+        // Gérer l'interaction continue avec le slider - VERSION SIMPLIFIÉE
         if (sliderInteractionActive && triggerHeldControllers.size > 0) {
             for (const [handness, heldController] of triggerHeldControllers) {
                 if (scene.vrScalePanel3D && scene.vrScalePanel3D.plane.isVisible && heldController.pointer) {
@@ -587,32 +587,22 @@ scene.onBeforeRenderObservable.add(() => {
                         // Calculer la position relative sur le slider
                         const localHitPoint = hit.pickedPoint.subtract(scene.vrScalePanel3D.plane.position);
                         
-                        // Le slider s'étend sur la largeur du panneau
+                        // Le slider s'étend sur 0.75 unités de largeur, centré
                         const sliderWidth = 0.75;
-                        const sliderStart = -sliderWidth / 2;
+                        const sliderStart = -sliderWidth / 2; // -0.375
+                        const sliderEnd = sliderWidth / 2;    // +0.375
                         
-                        // Convertir la position X locale en valeur de slider (-1 à 1)
+                        // Convertir la position X locale en valeur de slider (-1 à 1) - VERSION PERMISSIVE
                         let sliderValue = (localHitPoint.x - sliderStart) / sliderWidth * 2 - 1;
                         sliderValue = Math.max(-1, Math.min(1, sliderValue)); // Limiter entre -1 et 1
                         
-                        // Appliquer directement le scale aux particules dans la boucle de rendu
-                        // Calculer le scale
-                        let calculatedScale;
-                        if (sliderValue < 0) {
-                            calculatedScale = 1 / (1 + Math.abs(sliderValue) * 9); // 9 = scaleRange - 1
-                        } else if (sliderValue > 0) {
-                            calculatedScale = 1 + sliderValue * 9;
-                        } else {
-                            calculatedScale = 1;
-                        }
-                        
-                        // Mettre à jour le scale en continu
+                        // Mettre à jour directement
                         scene.vrScalePanel3D.updateScale(sliderValue);
                         scene.vrScalePanel3D.currentSliderValue = sliderValue;
                         
                         // Log pour debug
-                        if (debugLogCount % 30 === 0) { // Log tous les 30 frames
-                            console.log(`VR Scale Drag: ${handness} - Slider: ${sliderValue.toFixed(3)}, Scale: ${calculatedScale.toFixed(2)}x`);
+                        if (debugLogCount % 60 === 0) {
+                            console.log(`🔄 VR Scale Drag: ${handness} - Hit X: ${localHitPoint.x.toFixed(3)}, Slider: ${sliderValue.toFixed(3)}, Scale: ${scene.currentScaleValue.toFixed(2)}x`);
                         }
                     }
                 }
@@ -1808,21 +1798,25 @@ function handleVRTriggerInteractionNew(controller, handness, isPressed = true) {
                 // Calculer la position relative sur le slider
                 const localHitPoint = hit.pickedPoint.subtract(scene.vrScalePanel3D.plane.position);
                 
-                // Le slider s'étend sur la largeur du panneau (1.2 unités de large)
-                // Le slider lui-même fait environ 0.75 unités de large, centré
+                // Le slider s'étend sur 0.75 unités de largeur, centré
                 const sliderWidth = 0.75;
-                const sliderStart = -sliderWidth / 2;
-                const sliderEnd = sliderWidth / 2;
+                const sliderStart = -sliderWidth / 2; // -0.375
+                const sliderEnd = sliderWidth / 2;    // +0.375
                 
-                // Convertir la position X locale en valeur de slider (-1 à 1)
-                let sliderValue = (localHitPoint.x - sliderStart) / sliderWidth * 2 - 1;
-                sliderValue = Math.max(-1, Math.min(1, sliderValue)); // Limiter entre -1 et 1
-                
-                // Mettre à jour le scale
-                scene.vrScalePanel3D.updateScale(sliderValue);
-                scene.vrScalePanel3D.currentSliderValue = sliderValue;
-                
-                console.log(`VR Scale Slider: Position X: ${localHitPoint.x.toFixed(3)}, Slider Value: ${sliderValue.toFixed(3)}, Scale: ${scene.currentScaleValue.toFixed(2)}x`);
+                // Vérifier si le clic est vraiment dans la zone du slider
+                if (localHitPoint.x >= sliderStart && localHitPoint.x <= sliderEnd) {
+                    // Convertir la position X locale en valeur de slider (-1 à 1)
+                    let sliderValue = (localHitPoint.x - sliderStart) / sliderWidth * 2 - 1;
+                    sliderValue = Math.max(-1, Math.min(1, sliderValue)); // Limiter strictement entre -1 et 1
+                    
+                    // Mettre à jour le scale
+                    scene.vrScalePanel3D.updateScale(sliderValue);
+                    scene.vrScalePanel3D.currentSliderValue = sliderValue;
+                    
+                    console.log(`VR Scale Slider INITIAL: Hit X: ${localHitPoint.x.toFixed(3)}, Slider: ${sliderValue.toFixed(3)}, Scale: ${scene.currentScaleValue.toFixed(2)}x`);
+                } else {
+                    console.log(`VR Scale Click OUTSIDE slider area: X: ${localHitPoint.x.toFixed(3)}, Slider range: ${sliderStart.toFixed(3)} to ${sliderEnd.toFixed(3)}`);
+                }
                 
                 // Indiquer que nous avons géré l'interaction avec le scale, pas besoin de chercher des particules
                 return;
@@ -2122,49 +2116,56 @@ function createVRScalePanel3D(scene) {
         }
     }
     
-    // Fonction pour mettre à jour la valeur de scale
+    // Fonction pour mettre à jour la valeur de scale - VERSION CORRIGÉE
     function updateScale(sliderValue) {
-        currentSliderValue = Math.max(-1, Math.min(1, sliderValue));
-        
-        // Mapper la valeur du slider vers l'échelle
-        if (currentSliderValue < 0) {
-            currentScale = 1 / (1 + Math.abs(currentSliderValue) * (scaleRange - 1));
-        } else if (currentSliderValue > 0) {
-            currentScale = 1 + currentSliderValue * (scaleRange - 1);
-        } else {
-            currentScale = 1;
+        // Assurer que sliderValue est un nombre valide
+        if (typeof sliderValue !== 'number' || isNaN(sliderValue)) {
+            console.warn(`Invalid sliderValue: ${sliderValue}, using 0 as default`);
+            sliderValue = 0;
         }
         
+        currentSliderValue = Math.max(-1, Math.min(1, sliderValue));
+        
+        // Mapping linéaire simple du slider (-1 à 1) vers scale (0.1x à 10x)
+        // -1 = 0.1x, 0 = 1.0x, +1 = 10.0x
+        if (currentSliderValue < 0) {
+            // De -1 à 0: de 0.1x à 1.0x
+            // Formule: 0.1 + (sliderValue + 1) * 0.9
+            currentScale = 0.1 + (currentSliderValue + 1) * 0.9;
+        } else if (currentSliderValue > 0) {
+            // De 0 à +1: de 1.0x à 10.0x
+            // Formule: 1.0 + sliderValue * 9.0
+            currentScale = 1.0 + currentSliderValue * 9.0;
+        } else {
+            // Exactement 0 = 1.0x
+            currentScale = 1.0;
+        }
+        
+        // Validation finale du scale
+        currentScale = Math.max(0.1, Math.min(10.0, currentScale));
         scene.currentScaleValue = currentScale;
         
-        // Appliquer directement le scale aux particules avec courbe agressive
+        console.log(`🎯 Scale Update: SliderValue=${currentSliderValue.toFixed(3)}, Scale=${currentScale.toFixed(2)}x`);
+        
+        // Appliquer directement aux particules avec espacement inverse simple
         try {
             if (scene.spriteManagers && scene.spriteManagers[0] && scene.spriteManagers[0].sprites) {
                 const sprites = scene.spriteManagers[0].sprites;
                 
-                // Courbe agressive pour plus d'effet visuel des deux côtés
-                let factor;
-                if (currentScale < 1.0) {
-                    // Pour scale < 1: étalement agressif avec courbe exponentielle
-                    // Utiliser une courbe qui va de 1.0 à 10.0 de façon exponentielle
-                    factor = Math.pow(10, (1 - currentScale) / 0.9); // De 1.0 à 10.0 de façon exponentielle
-                } else {
-                    // Pour scale >= 1: compactage TRÈS agressif
-                    // Utiliser une courbe qui va jusqu'à 0.01 pour X10 (très très rapproché)
-                    factor = Math.pow(0.01, (currentScale - 1) / 9); // De 1.0 à 0.01 de façon exponentielle
-                }
+                // Facteur d'espacement simple : plus le scale est élevé, plus les particules sont serrées
+                const spacingFactor = 1.0 / currentScale;
                 
-                console.log(`Applying scale ${currentScale.toFixed(2)} with AGGRESSIVE factor ${factor.toFixed(4)} to ${sprites.length} sprites`);
+                console.log(`Applying scale ${currentScale.toFixed(2)}x with spacing factor ${spacingFactor.toFixed(3)} to ${sprites.length} sprites`);
                 
                 sprites.forEach(sprite => {
                     if (sprite.originalPosition) {
-                        sprite.position.x = sprite.originalPosition.x * factor;
-                        sprite.position.y = sprite.originalPosition.y * factor;
-                        sprite.position.z = sprite.originalPosition.z * factor;
+                        sprite.position.x = sprite.originalPosition.x * spacingFactor;
+                        sprite.position.y = sprite.originalPosition.y * spacingFactor;
+                        sprite.position.z = sprite.originalPosition.z * spacingFactor;
                     }
                 });
                 
-                console.log(`✅ Scale applied successfully - ${currentScale > 1 ? 'HEAVILY COMPACTED' : 'EXPANDED'}`);
+                console.log(`✅ Scale applied successfully - Spacing: ${spacingFactor.toFixed(3)}x`);
             } else {
                 console.log(`❌ No sprite managers or sprites available`);
             }
