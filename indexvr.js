@@ -584,17 +584,15 @@ scene.onBeforeRenderObservable.add(() => {
                     const hit = ray.intersectsMesh(scene.vrScalePanel3D.plane);
                     
                     if (hit.hit) {
-                        // Calculer la position relative sur le slider
+                        // Calculer la position relative sur le slider - COHÉRENT AVEC LA VERSION INITIALE
                         const localHitPoint = hit.pickedPoint.subtract(scene.vrScalePanel3D.plane.position);
                         
-                        // Le slider s'étend sur 0.75 unités de largeur, centré
-                        const sliderWidth = 0.75;
-                        const sliderStart = -sliderWidth / 2; // -0.375
-                        const sliderEnd = sliderWidth / 2;    // +0.375
+                        // Même logique que pour le clic initial
+                        const panelWidth = 1.2;
                         
-                        // Convertir la position X locale en valeur de slider (-1 à 1) - VERSION PERMISSIVE
-                        let sliderValue = (localHitPoint.x - sliderStart) / sliderWidth * 2 - 1;
-                        sliderValue = Math.max(-1, Math.min(1, sliderValue)); // Limiter entre -1 et 1
+                        // Mapper la position X du panneau vers la valeur du slider
+                        let sliderValue = localHitPoint.x / (panelWidth / 2); // Normaliser entre -1 et +1
+                        sliderValue = Math.max(-1, Math.min(1, sliderValue)); // Limiter strictement
                         
                         // Mettre à jour directement
                         scene.vrScalePanel3D.updateScale(sliderValue);
@@ -1800,28 +1798,32 @@ function handleVRTriggerInteractionNew(controller, handness, isPressed = true) {
                 console.log(`VR ${handness}: Début interaction avec le panneau de scale`);
                 sliderInteractionActive = true;
                 
-                // Calculer la position relative sur le slider
+                // Calculer la position relative sur le slider - VERSION CORRIGÉE POUR VR
                 const localHitPoint = hit.pickedPoint.subtract(scene.vrScalePanel3D.plane.position);
                 
-                // Le slider s'étend sur 0.75 unités de largeur, centré
-                const sliderWidth = 0.75;
-                const sliderStart = -sliderWidth / 2; // -0.375
-                const sliderEnd = sliderWidth / 2;    // +0.375
+                // Debug: Afficher les coordonnées du hit point
+                console.log(`🎯 VR Hit Debug: World=${hit.pickedPoint.toString()}, Panel=${scene.vrScalePanel3D.plane.position.toString()}, Local=${localHitPoint.toString()}`);
                 
-                // Vérifier si le clic est vraiment dans la zone du slider
-                if (localHitPoint.x >= sliderStart && localHitPoint.x <= sliderEnd) {
-                    // Convertir la position X locale en valeur de slider (-1 à 1)
-                    let sliderValue = (localHitPoint.x - sliderStart) / sliderWidth * 2 - 1;
-                    sliderValue = Math.max(-1, Math.min(1, sliderValue)); // Limiter strictement entre -1 et 1
-                    
-                    // Mettre à jour le scale
-                    scene.vrScalePanel3D.updateScale(sliderValue);
-                    scene.vrScalePanel3D.currentSliderValue = sliderValue;
-                    
-                    console.log(`VR Scale Slider INITIAL: Hit X: ${localHitPoint.x.toFixed(3)}, Slider: ${sliderValue.toFixed(3)}, Scale: ${scene.currentScaleValue.toFixed(2)}x`);
-                } else {
-                    console.log(`VR Scale Click OUTSIDE slider area: X: ${localHitPoint.x.toFixed(3)}, Slider range: ${sliderStart.toFixed(3)} to ${sliderEnd.toFixed(3)}`);
-                }
+                // Le panneau fait 1.2 unités de largeur totale
+                const panelWidth = 1.2;
+                const panelStart = -panelWidth / 2; // -0.6
+                const panelEnd = panelWidth / 2;    // +0.6
+                
+                // Le slider occupe 75% du panneau, donc 0.9 unités, centré
+                const sliderWidth = 0.9;
+                const sliderStart = -sliderWidth / 2; // -0.45
+                const sliderEnd = sliderWidth / 2;    // +0.45
+                
+                // Mapper la position X du panneau vers la valeur du slider
+                // De -0.6 (gauche du panneau) à +0.6 (droite du panneau) = -1 à +1 sur le slider
+                let sliderValue = localHitPoint.x / (panelWidth / 2); // Normaliser entre -1 et +1
+                sliderValue = Math.max(-1, Math.min(1, sliderValue)); // Limiter strictement
+                
+                // Mettre à jour le scale
+                scene.vrScalePanel3D.updateScale(sliderValue);
+                scene.vrScalePanel3D.currentSliderValue = sliderValue;
+                
+                console.log(`🎯 VR Scale CORRECTED: Hit X: ${localHitPoint.x.toFixed(3)}, Slider: ${sliderValue.toFixed(3)}, Scale: ${scene.currentScaleValue.toFixed(2)}x`);
                 
                 // Indiquer que nous avons géré l'interaction avec le scale, pas besoin de chercher des particules
                 return;
