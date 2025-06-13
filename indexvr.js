@@ -1129,10 +1129,10 @@ function getColor(type) {
     return randColor;
 }
 
-// Update sprite positions to add small movements
+// Update sprite positions to add small movements - COMPATIBLE AVEC LE SCALE
 function updateSpritePositions() {
     time += 0.004;
-	const camera = scene.activeCamera; 
+	const camera = scene.activeCamera;
 	const cameraDirection = camera.getForwardRay().direction.normalize();
 	const fov = camera.fov; // Champs de vision de la caméra
 	const cameraPosition = camera.position;
@@ -1145,10 +1145,15 @@ function updateSpritePositions() {
 			const spriteDirection = sprite.position.subtract(cameraPosition).normalize();
 			const angle = Math.acos(BABYLON.Vector3.Dot(cameraDirection, spriteDirection));
 			if( angle < fov) {
+				// CORRECTION: Utiliser les positions originales avec le scale appliqué
 				const originalPosition = originalPositions[idx];
-				sprite.position.x = originalPosition.x + 0.8 * Math.sin(time + idx);
-				sprite.position.y = originalPosition.y + 0.8 * Math.cos(time + idx);
-				sprite.position.z = originalPosition.z + 0.8 * Math.sin(time + idx);
+				const currentScale = scene.currentScaleValue || 1.0;
+				const scaleFactor = 1.0 / currentScale; // Même logique que updateScale
+				
+				// Base scalée + petite animation
+				sprite.position.x = (originalPosition.x * scaleFactor) + 0.8 * Math.sin(time + idx);
+				sprite.position.y = (originalPosition.y * scaleFactor) + 0.8 * Math.cos(time + idx);
+				sprite.position.z = (originalPosition.z * scaleFactor) + 0.8 * Math.sin(time + idx);
 				sprite.angle = 0.01*idx;
 			}
 		}
